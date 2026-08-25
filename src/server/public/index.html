@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>dev-radar</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%234d7c0f'/></svg>">
+</head>
+<body>
+
+<div class="shell">
+
+  <nav class="rail" aria-label="Sections">
+    <div class="rail-mark">
+      <span class="rail-mark-name">dev<span>radar</span></span>
+      <span class="rail-mark-sub" id="provider-badge">checking model…</span>
+    </div>
+
+    <ul class="rail-nav">
+      <li><button class="rail-link is-active" data-view="radar" aria-current="page">Radar</button></li>
+      <li><button class="rail-link" data-view="topics">Topics</button></li>
+      <li><button class="rail-link" data-view="weekly">Weekly</button></li>
+      <li><button class="rail-link" data-view="history">History</button></li>
+      <li><button class="rail-link" data-view="sources">Sources</button></li>
+      <li><button class="rail-link" data-view="settings">Settings</button></li>
+    </ul>
+
+    <div class="rail-foot">
+      <button class="btn btn-primary" id="run-radar">Run research</button>
+      <p class="rail-note" id="last-run">No runs yet</p>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div id="flash" class="flash" role="status" aria-live="polite" hidden></div>
+
+    <!-- RADAR ---------------------------------------------------------- -->
+    <section class="view is-active" data-view="radar">
+      <header class="view-head">
+        <p class="eyebrow">Daily radar</p>
+        <h1 id="radar-date">Today</h1>
+        <p class="lede" id="radar-summary">Loading…</p>
+      </header>
+      <div id="top-pick"></div>
+      <ol class="topic-list" id="radar-list"></ol>
+    </section>
+
+    <!-- TOPICS --------------------------------------------------------- -->
+    <section class="view" data-view="topics">
+      <header class="view-head">
+        <p class="eyebrow">All topics</p>
+        <h1>Everything on the radar</h1>
+        <div class="filters">
+          <label>Minimum score
+            <input type="number" id="filter-min" min="0" max="100" step="5" value="0">
+          </label>
+          <label>Status
+            <select id="filter-status">
+              <option value="any">Any</option>
+              <option value="shortlisted">Shortlisted</option>
+              <option value="new">New</option>
+              <option value="drafted">Drafted</option>
+              <option value="published">Published</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
+        </div>
+      </header>
+      <ol class="topic-list" id="topics-list"></ol>
+    </section>
+
+    <!-- WEEKLY --------------------------------------------------------- -->
+    <section class="view" data-view="weekly">
+      <header class="view-head">
+        <p class="eyebrow">Weekly developer radar</p>
+        <h1 id="weekly-range">Last 7 days</h1>
+      </header>
+      <div id="weekly-body"></div>
+    </section>
+
+    <!-- HISTORY -------------------------------------------------------- -->
+    <section class="view" data-view="history">
+      <header class="view-head">
+        <p class="eyebrow">History</p>
+        <h1>What you have run and written</h1>
+      </header>
+      <div id="history-body"></div>
+    </section>
+
+    <!-- SOURCES -------------------------------------------------------- -->
+    <section class="view" data-view="sources">
+      <header class="view-head">
+        <p class="eyebrow">Sources</p>
+        <h1>Where topics come from</h1>
+        <p class="lede">Turning a source off stops it being fetched. Feed URLs live in
+          <code>config/sources.json</code>.</p>
+      </header>
+      <div id="sources-body"></div>
+    </section>
+
+    <!-- SETTINGS ------------------------------------------------------- -->
+    <section class="view" data-view="settings">
+      <header class="view-head">
+        <p class="eyebrow">Settings</p>
+        <h1>Thresholds and targets</h1>
+      </header>
+      <div id="settings-body"></div>
+    </section>
+  </main>
+
+  <!-- DETAIL PANEL ----------------------------------------------------- -->
+  <aside class="panel" id="panel" hidden tabindex="-1" role="region" aria-label="Topic detail">
+    <div class="panel-head">
+      <button class="panel-close" id="panel-close" aria-label="Close topic">Close</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+  </aside>
+
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

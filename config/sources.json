@@ -1,0 +1,289 @@
+{
+  "_readme": [
+    "Every source here is free and needs no API key. GitHub sources work",
+    "unauthenticated at 60 requests/hour; set GITHUB_TOKEN for 5000.",
+    "",
+    "tier: 'primary'   = the project's own announcement. Safe to cite as fact.",
+    "      'reputable' = established publication. Cite, but prefer the primary link.",
+    "      'community' = discovery signal only. Never cited as a factual source.",
+    "",
+    "These feed URLs have NOT been verified from inside this project's build",
+    "environment (no outbound network). Run `npm run sources -- --check` on your",
+    "machine to see which respond, and disable or fix any that fail."
+  ],
+  "sources": [
+    {
+      "key": "nodejs-blog",
+      "name": "Node.js Blog",
+      "url": "https://nodejs.org/en/feed/blog.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "nodejs",
+      "enabled": true,
+      "weight": 1.4
+    },
+    {
+      "key": "nodejs-releases",
+      "name": "Node.js Releases",
+      "url": "nodejs/node",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "nodejs",
+      "enabled": true,
+      "weight": 1.4
+    },
+    {
+      "key": "v8-blog",
+      "name": "V8 Blog",
+      "url": "https://v8.dev/blog.atom",
+      "kind": "atom",
+      "tier": "primary",
+      "category": "javascript",
+      "enabled": true,
+      "weight": 1.4
+    },
+    {
+      "key": "tc39-proposals",
+      "name": "TC39 ecma262 Releases",
+      "url": "tc39/ecma262",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "javascript",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "mdn-blog",
+      "name": "MDN Blog",
+      "url": "https://developer.mozilla.org/en-US/blog/rss.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "web-platform",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "react-blog",
+      "name": "React Blog",
+      "url": "https://react.dev/rss.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "react",
+      "enabled": true,
+      "weight": 1.4
+    },
+    {
+      "key": "react-releases",
+      "name": "React Releases",
+      "url": "facebook/react",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "react",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "nextjs-blog",
+      "name": "Next.js Blog",
+      "url": "https://nextjs.org/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "nextjs",
+      "enabled": true,
+      "weight": 1.4
+    },
+    {
+      "key": "nextjs-releases",
+      "name": "Next.js Releases",
+      "url": "vercel/next.js",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "nextjs",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "typescript-blog",
+      "name": "TypeScript Blog",
+      "url": "https://devblogs.microsoft.com/typescript/feed/",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "typescript",
+      "enabled": true,
+      "weight": 1.4
+    },
+    {
+      "key": "typescript-releases",
+      "name": "TypeScript Releases",
+      "url": "microsoft/TypeScript",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "typescript",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "chrome-developers",
+      "name": "Chrome for Developers",
+      "url": "https://developer.chrome.com/static/blog/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "web-platform",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "webdev",
+      "name": "web.dev",
+      "url": "https://web.dev/static/blog/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "performance",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "google-search-central",
+      "name": "Google Search Central Blog",
+      "url": "https://developers.google.com/search/blog/feed.xml",
+      "kind": "atom",
+      "tier": "primary",
+      "category": "seo",
+      "enabled": true,
+      "weight": 1.3
+    },
+    {
+      "key": "deno-blog",
+      "name": "Deno Blog",
+      "url": "https://deno.com/feed",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "javascript",
+      "enabled": true,
+      "weight": 1.1
+    },
+    {
+      "key": "bun-releases",
+      "name": "Bun Releases",
+      "url": "oven-sh/bun",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "javascript",
+      "enabled": true,
+      "weight": 1.1
+    },
+    {
+      "key": "vite-releases",
+      "name": "Vite Releases",
+      "url": "vitejs/vite",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "devtools",
+      "enabled": true,
+      "weight": 1.1
+    },
+    {
+      "key": "vercel-blog",
+      "name": "Vercel Blog",
+      "url": "https://vercel.com/atom",
+      "kind": "atom",
+      "tier": "primary",
+      "category": "frontend",
+      "enabled": true,
+      "weight": 1.1
+    },
+    {
+      "key": "github-blog",
+      "name": "The GitHub Blog",
+      "url": "https://github.blog/feed/",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "devtools",
+      "enabled": true,
+      "weight": 1.0
+    },
+    {
+      "key": "github-security",
+      "name": "GitHub Security Blog",
+      "url": "https://github.blog/tag/security/feed/",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "security",
+      "enabled": true,
+      "weight": 1.1
+    },
+    {
+      "key": "javascript-weekly",
+      "name": "JavaScript Weekly",
+      "url": "https://javascriptweekly.com/rss",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "javascript",
+      "enabled": true,
+      "weight": 1.0
+    },
+    {
+      "key": "node-weekly",
+      "name": "Node Weekly",
+      "url": "https://nodeweekly.com/rss",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "nodejs",
+      "enabled": true,
+      "weight": 1.0
+    },
+    {
+      "key": "smashing-magazine",
+      "name": "Smashing Magazine",
+      "url": "https://www.smashingmagazine.com/feed/",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "frontend",
+      "enabled": true,
+      "weight": 0.95
+    },
+    {
+      "key": "css-tricks",
+      "name": "CSS-Tricks",
+      "url": "https://css-tricks.com/feed/",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "css-html",
+      "enabled": true,
+      "weight": 0.9
+    },
+    {
+      "key": "gh-trending-ts",
+      "name": "GitHub: rising TypeScript projects",
+      "url": "https://github.com/search",
+      "kind": "github-search",
+      "tier": "community",
+      "category": "open-source",
+      "enabled": true,
+      "weight": 0.85,
+      "query": "language:TypeScript stars:>1000 pushed:>2026-01-01"
+    },
+    {
+      "key": "hn-frontend",
+      "name": "Hacker News: frontend discussion",
+      "url": "https://hn.algolia.com",
+      "kind": "hackernews",
+      "tier": "community",
+      "category": "frontend",
+      "enabled": true,
+      "weight": 0.85,
+      "query": "react OR nextjs OR frontend OR javascript"
+    },
+    {
+      "key": "hn-performance",
+      "name": "Hacker News: performance and architecture",
+      "url": "https://hn.algolia.com",
+      "kind": "hackernews",
+      "tier": "community",
+      "category": "performance",
+      "enabled": true,
+      "weight": 0.85,
+      "query": "web performance OR core web vitals OR software architecture"
+    }
+  ]
+}

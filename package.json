@@ -1,0 +1,41 @@
+{
+  "name": "dev-radar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-first developer content radar and writing assistant. Free to run, no paid APIs.",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "main": "dist/cli/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "radar": "tsx src/cli/index.ts radar",
+    "topics": "tsx src/cli/index.ts topics",
+    "topic": "tsx src/cli/index.ts topic",
+    "daily": "tsx src/cli/index.ts daily",
+    "weekly": "tsx src/cli/index.ts weekly",
+    "sources": "tsx src/cli/index.ts sources",
+    "history": "tsx src/cli/index.ts history",
+    "settings": "tsx src/cli/index.ts settings",
+    "style:learn": "tsx src/cli/index.ts style:learn",
+    "generate:linkedin": "tsx src/cli/index.ts generate:linkedin",
+    "generate:medium": "tsx src/cli/index.ts generate:medium",
+    "dashboard": "tsx src/server/server.ts",
+    "demo": "tsx scripts/demo-seed.ts",
+    "dev": "tsx src/server/server.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "fast-xml-parser": "^4.5.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3"
+  }
+}
