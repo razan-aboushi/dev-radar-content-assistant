@@ -1225,26 +1225,73 @@ function renderTopic(body, data) {
     );
   }
 
+  // No key yet on the published site: a prominent callout above the buttons,
+  // not a grey footnote below them. Muted small print next to a button that
+  // will fail is a button that looks broken.
+  if (!canGenerate) {
+    body.appendChild(
+      el('div', { class: 'callout callout--action' }, [
+        el('p', { text: t('ai.needKey') }),
+        el('button', {
+          class: 'btn btn-solid',
+          attrs: { type: 'button' },
+          text: t('ai.openSettings'),
+          on: { click: () => void show('settings') },
+        }),
+      ]),
+    );
+  }
+
   body.appendChild(el('div', { class: 'btn-row' }, actions));
 
-  // No key yet on the published site: say what to do rather than showing a
-  // button that fails, and link straight to the settings that fix it.
-  if (!canGenerate) {
-    const hint = el('p', { class: 'kv panel-note' }, [
-      document.createTextNode(`${t('ai.needKey')} `),
-      el('button', {
-        class: 'link-button',
-        attrs: { type: 'button' },
-        text: t('ai.openSettings'),
-        on: { click: () => void show('settings') },
-      }),
-    ]);
-    body.appendChild(hint);
-  }
+  /*
+    Feedback belongs beside the control that caused it.
+
+    These buttons live in the detail panel on one side of the screen while the
+    flash bar lives at the top of the main column on the other — measured at
+    640px apart, and further once the panel is scrolled. Clicking Generate
+    reported "no API key" into a region you were not looking at, which is
+    indistinguishable from the button doing nothing at all.
+  */
+  const statusHost = el('div', { class: 'panel-status', attrs: { id: 'panel-status', role: 'status', 'aria-live': 'polite' } });
+  body.appendChild(statusHost);
 
   const draftsHost = el('div', { attrs: { id: 'drafts-host' } });
   body.appendChild(draftsHost);
   for (const draft of drafts) draftsHost.appendChild(draftNode(draft));
+}
+
+/**
+ * Shows a message inside the topic panel, next to the generate buttons.
+ * Mirrored to the flash bar so the message is not missed either way.
+ */
+function panelStatus(message, kind, action) {
+  const host = document.getElementById('panel-status');
+  flash(message, kind);
+  if (!host) return;
+
+  clear(host);
+  const box = el('div', { class: `callout callout--${kind || 'ok'}` }, [
+    el('p', { text: message, attrs: { dir: 'auto' } }),
+  ]);
+  if (action) {
+    box.appendChild(
+      el('button', {
+        class: 'btn btn-solid',
+        attrs: { type: 'button' },
+        text: action.label,
+        on: { click: action.onClick },
+      }),
+    );
+  }
+  host.appendChild(box);
+  // The panel scrolls independently; bring the message into view within it.
+  box.scrollIntoView({ block: 'nearest' });
+}
+
+function clearPanelStatus() {
+  const host = document.getElementById('panel-status');
+  if (host) clear(host);
 }
 
 /* -------------------------------------------------------------- drafts */
@@ -1457,7 +1504,19 @@ function aiErrorMessage(error) {
 async function generate(topicId, kind, angle, button, detail) {
   const isArticle = kind === 'medium';
   const busyLabel = t(isArticle ? 'draft.generatingArticle' : 'draft.generatingPost');
-  flash(t(isArticle ? 'draft.generatingArticleFlash' : 'draft.generatingPostFlash'));
+
+  // Nothing can be written without a model. Say so where the button is, and
+  // offer the one action that fixes it, rather than failing into a message
+  // in another column.
+  if (!window.dataSource.canWrite && !window.aiClient.hasKey) {
+    panelStatus(t('ai.errNoKey'), 'error', {
+      label: t('ai.openSettings'),
+      onClick: () => void show('settings'),
+    });
+    return;
+  }
+
+  panelStatus(t(isArticle ? 'draft.generatingArticleFlash' : 'draft.generatingPostFlash'), 'ok');
 
   const original = button ? button.textContent : null;
   if (button) {
@@ -1490,6 +1549,7 @@ async function generate(topicId, kind, angle, button, detail) {
 
     const host = document.getElementById('drafts-host');
     if (host) host.insertBefore(draftNode(content, extra), host.firstChild);
+    clearPanelStatus();
     flash(
       content.mode === 'scaffold'
         ? t('draft.generatedScaffold')
@@ -1503,7 +1563,13 @@ async function generate(topicId, kind, angle, button, detail) {
       extra.belowThreshold ? 'warn' : 'ok',
     );
   } catch (error) {
-    flash(t('draft.generateFailed', { reason: aiErrorMessage(error) }), 'error');
+    // Failures land beside the button, with the fix attached when there is one.
+    const needsKey = error && (error.reason === 'noKey' || error.reason === 'invalidKey');
+    panelStatus(
+      t('draft.generateFailed', { reason: aiErrorMessage(error) }),
+      'error',
+      needsKey ? { label: t('ai.openSettings'), onClick: () => void show('settings') } : null,
+    );
   } finally {
     if (button) {
       button.disabled = false;

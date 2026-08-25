@@ -469,6 +469,44 @@ test('the language switch is present, keyboard reachable and labelled in both la
   assert.ok(html.includes('العربية'));
 });
 
+test('action feedback is reported beside the control, not only in the flash bar', () => {
+  /*
+    The regression this pins: the generate buttons live in the detail panel on
+    one side of a wide screen and the flash bar lives at the top of the main
+    column on the other — measured 640px apart, and off-screen entirely once
+    the panel is scrolled. Clicking Generate with no API key reported the
+    problem into a region the reader was not looking at, which is
+    indistinguishable from the button doing nothing.
+  */
+  const app = read('app.js');
+  assert.ok(app.includes('function panelStatus'), 'panelStatus is gone');
+  assert.ok(app.includes("id: 'panel-status'"), 'the panel has no status host');
+
+  // generate() must report failures into the panel, not just flash().
+  const generate = app.slice(app.indexOf('async function generate(topicId'));
+  const body = generate.slice(0, generate.indexOf('\n}\n'));
+  assert.ok(body.includes('panelStatus('), 'generate() does not report into the panel');
+
+  // And the missing-key case must be caught before any request is attempted.
+  assert.ok(
+    /!window\.dataSource\.canWrite && !window\.aiClient\.hasKey/.test(body),
+    'generate() does not short-circuit when there is no key',
+  );
+  // The message must carry the action that fixes it.
+  assert.ok(body.includes("t('ai.openSettings')"), 'the failure offers no way forward');
+});
+
+test('the panel warns about a missing key before the buttons, not after', () => {
+  // A muted footnote under a button that will fail is a button that looks
+  // broken. The callout goes above them.
+  const app = read('app.js');
+  const calloutAt = app.indexOf("callout--action");
+  const buttonsAt = app.indexOf("el('div', { class: 'btn-row' }, actions)");
+  assert.ok(calloutAt > -1, 'the missing-key callout is gone');
+  assert.ok(buttonsAt > -1, 'the generate button row is gone');
+  assert.ok(calloutAt < buttonsAt, 'the callout must render before the buttons');
+});
+
 test('the stylesheet has no physical left/right properties left to break RTL', () => {
   const css = read('styles.css');
   const offenders: string[] = [];

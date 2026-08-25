@@ -850,6 +850,52 @@ h2 {
 
 .panel-note { line-height: 1.6; }
 
+/* ------------------------------------------------------------ callouts */
+
+/*
+  Feedback for an action taken in the detail panel. It lives here rather than
+  only in the flash bar because the two are on opposite sides of a wide screen
+  — measured 640px apart — and a reply you cannot see reads as no reply.
+*/
+.panel-status:empty { display: none; }
+
+.callout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-inline-start-width: 3px;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.callout p { margin: 0; flex: 1 1 220px; }
+
+.callout--ok { border-inline-start-color: var(--signal); }
+.callout--warn { border-inline-start-color: var(--warn); color: var(--warn); }
+.callout--error {
+  border-color: var(--bad);
+  border-inline-start-color: var(--bad);
+  background: #b4231810;
+  color: var(--bad);
+}
+.callout--action {
+  border-inline-start-color: var(--signal);
+  background: #4d7c0f0f;
+}
+
+.btn-solid {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+  white-space: nowrap;
+}
+.btn-solid:hover { background: #3f6a0b; border-color: #3f6a0b; }
+
 /* --------------------------------------------------------- static mode */
 
 .mode-banner {
