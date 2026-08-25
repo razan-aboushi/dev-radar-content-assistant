@@ -17,6 +17,8 @@ import { scoreStyle } from '../src/writing/evaluate';
 import { createTestDb, setSetting } from '../src/db';
 import { insertItems, listScoredTopics } from '../src/db/repositories';
 import { buildTopics } from '../src/pipeline/run';
+import { buildContext } from '../src/writing/context';
+import { generateMedium } from '../src/writing/medium';
 import { loadProfile } from '../src/writing/style';
 import { selectHashtags } from '../src/writing/context';
 import type { NormalizedItem, SourceConfig, StoredItem } from '../src/types';
@@ -292,3 +294,56 @@ test('a genuinely AI-related topic still gets #AI', () => {
   };
   assert.ok(selectHashtags(profile, topic).includes('#AI'));
 });
+
+/* --------------------------------------------------- medium outline pass */
+
+test('outline preamble never becomes a section heading', async () => {
+  // llama3.1:8b answered the outline prompt with "Here are the section
+  // headings for the technical article:" before listing them, and the article
+  // opened with that line as a "## " heading.
+  const outline = [
+    'Here are the section headings for the technical article:',
+    'Why This Update Matters',
+    'A Brief Explanation of the Changes',
+    'How Turbopack and Next.js Interact',
+    'A Real-World Scenario',
+    'Common Mistakes',
+    'My Takeaway',
+  ].join('\n');
+
+  const headings: string[] = [];
+  const provider = {
+    name: 'stub', model: 'stub',
+    available: async () => true,
+    complete: async ({ prompt }: { prompt: string }) => {
+      if (prompt.startsWith('Plan a technical article')) return outline;
+      for (const line of prompt.split('\n')) {
+        if (line.startsWith('- ')) headings.push(line.slice(2));
+      }
+      return '## A section\n\nSome prose about the topic.';
+    },
+  };
+
+  const db = createTestDb();
+  db.prepare(
+    `INSERT INTO sources (key, name, url, kind, tier, category, enabled, weight)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+  ).run('nodejs-blog', 'Node Blog', 'https://x/f', 'rss', 'primary', 'nodejs', 1.4);
+  insertItems(db, [item()]);
+  buildTopics(db);
+  const topic = listScoredTopics(db, { status: 'any' })[0]!.topic;
+
+  const context = buildContext(db, topic, null, loadProfile());
+  const result = await generateMedium(db, context, provider as never);
+
+  assert.ok(!headings.some(isPreambleish), `preamble reached the sections: ${headings.join(' | ')}`);
+  assert.ok(
+    !/^#{1,6}\s+here (?:are|is)/im.test(result.content.body),
+    'preamble heading reached the article body',
+  );
+  db.close();
+});
+
+function isPreambleish(line: string): boolean {
+  return /^here (?:are|is)\b/i.test(line) || /section headings?/i.test(line);
+}

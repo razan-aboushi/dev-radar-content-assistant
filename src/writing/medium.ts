@@ -114,6 +114,7 @@ async function writeArticle(
     .split('\n')
     .map((line) => line.replace(/^[\s\-*#\d.)]+/, '').trim())
     .filter((line) => line.length > 3 && line.length < 120)
+    .filter((line) => !isOutlinePreamble(line))
     .slice(0, 9);
 
   if (sections.length < 4) throw new Error('outline pass produced too few sections');
@@ -160,12 +161,35 @@ function truncateForPrompt(text: string): string {
   return text.length > 2500 ? `${text.slice(0, 2500)}…` : text;
 }
 
+/**
+ * Lines the model writes *about* the outline rather than as part of it.
+ *
+ * Against a real llama3.1:8b the outline pass answered "Here are the section
+ * headings for the technical article:" before listing them. That line passed
+ * the length filter, became section one, and the article opened with the
+ * heading "## Here are the section headings for the technical article:".
+ */
+function isOutlinePreamble(line: string): boolean {
+  return /^(?:here (?:are|is)|here's|below (?:are|is)|the following|sure|certainly|of course)\b/i.test(line)
+    || /\b(?:section headings?|outline|article plan)\b\s*:?\s*$/i.test(line);
+}
+
 function cleanArticle(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^(?:here(?:'s| is) (?:the|your|a) [^\n:]*:?\s*)/i, '')
-    .replace(/^#\s+.*\n/, '') // Drop a duplicated H1; the title is stored separately.
-    .trim();
+  let text = raw.trim();
+  // Broader than "here's the": the model also opens with "Here are the…",
+  // "Sure, here is…", "Below is…".
+  text = text.replace(
+    /^(?:(?:sure|certainly|of course)[,!]?\s*)?(?:here(?:'s| is| are)|below (?:is|are))\b[^\n]*:\s*\n?/i,
+    '',
+  );
+  // Drop a leading heading of any level when it is talk about the article
+  // rather than a section of it.
+  text = text.replace(/^#{1,6}\s+([^\n]*)\n?/, (match, heading: string) =>
+    isOutlinePreamble(heading.trim()) ? '' : match,
+  );
+  // Drop a duplicated H1; the title is stored separately.
+  text = text.replace(/^#\s+.*\n/, '');
+  return text.trim();
 }
 
 function evaluate(
