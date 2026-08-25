@@ -60,7 +60,17 @@
     "supercharge your",
     "10x your"
   ],
-  "emojis": ["💛", "👀", "😂", "🚀", "👩‍💻", "🤖", "🛑", "🔥", "⚡"],
+  "emojis": [
+    "💛",
+    "👀",
+    "😂",
+    "🚀",
+    "👩‍💻",
+    "🤖",
+    "🛑",
+    "🔥",
+    "⚡"
+  ],
   "preferredHashtags": [
     "#JavaScript",
     "#TypeScript",

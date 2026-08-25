@@ -9,6 +9,7 @@ import {
   countSignals,
   haystack,
   matchedSignals,
+  splitFocusHits,
 } from './signals';
 import type { ScoreBreakdown, SourceTier, Topic, TopicScore } from '../types';
 
@@ -20,14 +21,29 @@ import type { ScoreBreakdown, SourceTier, Topic, TopicScore } from '../types';
  * TOPIC SCORE = weighted sum of the seven components in the brief.
  */
 
+/**
+ * Weights were rebalanced after a live run ranked an Apple silicon launch
+ * first and a sponsored listicle third, above every genuinely on-topic item.
+ *
+ * Two things were wrong. Freshness decided the order, because every component
+ * has a non-zero floor and the only one that moved much between items was the
+ * date. And originality read 95 for all twelve of the top topics — it only
+ * drops when a story is carried by several sources, which is rare once
+ * clustering has already merged the duplicates — so 14% of the weight was
+ * spent on a number that never discriminated.
+ *
+ * Relevance and audience fit are the two components that answer the question
+ * the tool exists to answer: is this for her readers? They now carry 40% of
+ * the score between them, up from 25%.
+ */
 export const WEIGHTS: Record<keyof ScoreBreakdown, number> = {
-  freshness: 0.15,
-  relevance: 0.15,
-  practicalValue: 0.18,
-  discussionPotential: 0.14,
-  educationalValue: 0.14,
-  originality: 0.14,
-  audienceFit: 0.10,
+  freshness: 0.12,
+  relevance: 0.18,
+  practicalValue: 0.15,
+  discussionPotential: 0.10,
+  educationalValue: 0.12,
+  originality: 0.11,
+  audienceFit: 0.22,
 };
 
 export interface ScoreInput {
@@ -40,6 +56,15 @@ export interface ScoreInput {
   priorSimilarity: number;
   /** Optional community engagement signal (HN points, GitHub stars). */
   engagement?: number;
+  /**
+   * Clock reading used for freshness. Defaults to now, captured once per call.
+   *
+   * Without it scoreTopic was not a pure function of its input: freshness read
+   * Date.now() directly, so two calls that straddled a millisecond produced
+   * different scores. The "scoring is deterministic" test caught this about 2%
+   * of the time and looked like a flake.
+   */
+  now?: number;
 }
 
 /**
@@ -47,8 +72,8 @@ export interface ScoreInput {
  * rather than 0 — many primary feeds omit dates, and punishing them would bias
  * the radar towards blogspam.
  */
-function scoreFreshness(publishedAt: string | null): { value: number; reason: string } {
-  const days = daysSince(publishedAt);
+function scoreFreshness(publishedAt: string | null, now: number): { value: number; reason: string } {
+  const days = daysSince(publishedAt, now);
   if (days === null) return { value: 50, reason: 'Freshness 50: no publication date in the feed' };
   if (days < 0) return { value: 95, reason: 'Freshness 95: dated in the future, treated as brand new' };
   const value = clamp(100 * 0.5 ** (days / 7));
@@ -57,14 +82,15 @@ function scoreFreshness(publishedAt: string | null): { value: number; reason: st
 
 function scoreRelevance(text: string, sourceWeight: number, tier: SourceTier): { value: number; reason: string } {
   const hay = haystack(text);
-  const focusHits = countSignals(hay, AUDIENCE_FOCUS);
+  const { core, broad } = splitFocusHits(matchedSignals(hay, AUDIENCE_FOCUS));
   const noiseHits = countSignals(hay, NOISE_SIGNALS);
   const tierBonus = tier === 'primary' ? 15 : tier === 'reputable' ? 7 : 0;
-  const base = clamp(28 + focusHits * 9 + tierBonus - noiseHits * 30);
+  const base = clamp(28 + core.length * 11 + broad.length * 4 + tierBonus - noiseHits * 30);
   const value = clamp(base * sourceWeight);
+  const hits = core.length + broad.length;
   return {
     value,
-    reason: `Relevance ${Math.round(value)}: ${focusHits} focus keyword(s), ${tier} source${noiseHits ? `, ${noiseHits} noise signal(s)` : ''}`,
+    reason: `Relevance ${Math.round(value)}: ${hits} focus keyword(s)${broad.length ? ` (${broad.length} broad)` : ''}, ${tier} source${noiseHits ? `, ${noiseHits} noise signal(s)` : ''}`,
   };
 }
 
@@ -122,16 +148,24 @@ function scoreOriginality(clusterSize: number, priorSimilarity: number): { value
  * A real headline plus summary hits 1–3 focus terms, rarely more, so the step
  * per hit has to be large: at 12 points a hit, a squarely on-topic Node.js
  * item scored 44 and the daily report described it as outside her subject
- * matter. One hit is a maybe, two is on-topic, three is squarely on-topic.
+ * matter. One core hit is a maybe, two is on-topic, three is squarely on-topic.
+ *
+ * Broad terms count for much less. Two of them used to be worth as much as two
+ * hits on "react" and "hydration", which put an Apple chip launch top of the
+ * daily radar.
  */
 function scoreAudienceFit(text: string): { value: number; reason: string } {
   const hay = haystack(text);
-  const hits = matchedSignals(hay, AUDIENCE_FOCUS);
-  const value = clamp(25 + hits.length * 15);
-  return {
-    value,
-    reason: `Audience fit ${Math.round(value)}: ${hits.length ? hits.slice(0, 4).join(', ') : 'outside stated focus areas'}`,
-  };
+  const { core, broad } = splitFocusHits(matchedSignals(hay, AUDIENCE_FOCUS));
+  const value = clamp(15 + core.length * 20 + broad.length * 7);
+
+  const detail = core.length
+    ? `${core.slice(0, 4).join(', ')}${broad.length ? ` (plus ${broad.length} broad term(s))` : ''}`
+    : broad.length
+      ? `only broad terms: ${broad.slice(0, 3).join(', ')}`
+      : 'outside stated focus areas';
+
+  return { value, reason: `Audience fit ${Math.round(value)}: ${detail}` };
 }
 
 /**
@@ -158,8 +192,10 @@ export function scoreTopic(topicId: number, input: ScoreInput): TopicScore {
   const text = `${input.topic.title} ${input.topic.summary}`;
   const summaryWords = wordCount(input.topic.summary);
   const engagement = input.engagement ?? 0;
+  // Read once, so every component sees the same instant.
+  const now = input.now ?? Date.now();
 
-  const freshness = scoreFreshness(input.topic.publishedAt);
+  const freshness = scoreFreshness(input.topic.publishedAt, now);
   const relevance = scoreRelevance(text, input.sourceWeight, input.topic.sourceTier);
   const practical = scorePractical(text);
   const discussion = scoreDiscussion(text, engagement);

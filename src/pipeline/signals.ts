@@ -34,14 +34,59 @@ export const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   'software-engineering': ['engineering', 'production', 'incident', 'postmortem', 'debugging', 'root cause', 'code quality', 'maintainability', 'lesson', 'best practice'],
 };
 
-/** Razan's own focus areas. Drives audienceFit. */
-export const AUDIENCE_FOCUS: string[] = [
+/**
+ * Razan's focus areas, in two tiers. Together they drive audienceFit, and they
+ * are the first thing to edit if the radar keeps surfacing the wrong subjects.
+ *
+ * CORE terms are specific to web and JavaScript work. A hit is real evidence
+ * the topic is for her readers.
+ */
+const CORE_FOCUS: string[] = [
+  // Frameworks and runtimes
   'react', 'next.js', 'nextjs', 'javascript', 'typescript', 'node.js', 'nodejs',
-  'frontend', 'ssr', 'hydration', 'server components', 'app router', 'performance',
-  'core web vitals', 'lcp', 'inp', 'cls', 'seo', 'canonical', 'crawl', 'indexing',
-  'bundle', 'code splitting', 'rendering', 'routing', 'api', 'production',
-  'debugging', 'memory leak', 'developer experience', 'ai',
+  'vue', 'svelte', 'angular', 'deno', 'bun',
+  // Rendering and the React model
+  'frontend', 'ssr', 'hydration', 'server components', 'server actions',
+  'app router', 'suspense', 'code splitting',
+  // Performance measurement
+  'core web vitals', 'web vitals', 'lcp', 'inp', 'cls', 'lighthouse',
+  'bundle', 'bundler', 'tree shaking',
+  // Search
+  'seo', 'canonical', 'crawl', 'indexing', 'sitemap', 'structured data',
+  // The platform itself
+  'web platform', 'browser', 'chrome', 'safari', 'firefox', 'webkit',
+  'css', 'html', 'tailwind', 'flexbox', 'accessibility', 'a11y',
+  'service worker', 'web component',
+  // Packaging and tooling
+  'npm', 'pnpm', 'yarn', 'lockfile', 'tsconfig', 'esm', 'commonjs',
+  'vite', 'webpack', 'esbuild', 'turbopack',
+  'vitest', 'playwright', 'jest', 'graphql',
 ];
+
+/**
+ * BROAD terms are genuine focus areas that almost any technical article also
+ * matches. They are not evidence on their own: an Apple silicon launch ranked
+ * first on a live run because "a big leap in performance and AI compute" hit
+ * two of them and counted the same as two hits on "react" and "hydration". A
+ * broad hit is worth roughly a third of a core hit.
+ */
+const BROAD_FOCUS_TERMS: string[] = [
+  'performance', 'api', 'production', 'debugging', 'ai', 'developer experience',
+  'memory leak', 'rendering', 'routing', 'streaming', 'dependency', 'testing',
+  'security',
+];
+
+export const AUDIENCE_FOCUS: string[] = [...CORE_FOCUS, ...BROAD_FOCUS_TERMS];
+
+export const BROAD_FOCUS: ReadonlySet<string> = new Set(BROAD_FOCUS_TERMS);
+
+/** Splits focus hits into the specific ones and the ones anything can match. */
+export function splitFocusHits(hits: string[]): { core: string[]; broad: string[] } {
+  return {
+    core: hits.filter((hit) => !BROAD_FOCUS.has(hit)),
+    broad: hits.filter((hit) => BROAD_FOCUS.has(hit)),
+  };
+}
 
 /** Signals that a topic gives the reader something they can act on. */
 export const PRACTICAL_SIGNALS: string[] = [

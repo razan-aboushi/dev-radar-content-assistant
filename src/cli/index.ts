@@ -20,11 +20,10 @@ import { displayScore } from '../pipeline/score';
 import { buildDaily, buildWeekly } from '../reports';
 import { checkSource } from '../sources/adapters';
 import { buildContext } from '../writing/context';
-import { exportContent, exportDaily } from '../writing/export';
+import { exportContent, exportDaily, type ExportFormat } from '../writing/export';
 import { generateLinkedIn, renderForPublishing } from '../writing/linkedin';
 import { generateMedium } from '../writing/medium';
 import { learnStyle, loadProfile } from '../writing/style';
-import { readCorpus } from '../writing/style';
 import type { AngleKind, ScoreBreakdown } from '../types';
 
 /* ----------------------------------------------------------- tiny arg parse */
@@ -491,8 +490,15 @@ async function cmdGenerate(db: DB, args: Args, kind: 'linkedin' | 'medium'): Pro
   out('Sources:');
   for (const url of content.sources) out(`  ${url}`);
 
-  const format = typeof args.flags.format === 'string' ? args.flags.format : 'md';
-  const file = exportContent(content, topic, format as 'md');
+  // Unvalidated, `--format pdf` wrote markdown into a file named .pdf.
+  const requested = typeof args.flags.format === 'string' ? args.flags.format : 'md';
+  const formats: ExportFormat[] = ['md', 'json', 'txt'];
+  if (!formats.includes(requested as ExportFormat)) {
+    out(`Unknown --format "${requested}". Expected one of: ${formats.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  const file = exportContent(content, topic, requested as ExportFormat);
   out('');
   out(`Saved to ${file}`);
   out('Nothing is published automatically. Copy it yourself when you are happy with it.');
@@ -513,9 +519,10 @@ async function cmdGenerate(db: DB, args: Args, kind: 'linkedin' | 'medium'): Pro
 }
 
 function cmdStyleLearn(): void {
-  const docs = readCorpus();
-  const { profile } = learnStyle();
-  if (docs.length === 0) {
+  // learnStyle reads the corpus itself; reading it again here parsed every
+  // sample twice and could disagree if a file changed between the two reads.
+  const { profile, docCount } = learnStyle();
+  if (docCount === 0) {
     out(`No samples found in ${config.corpusDir}.`);
     out('');
     out('Save some of your own past posts there as .md or .txt files — one post per file —');
@@ -524,7 +531,7 @@ function cmdStyleLearn(): void {
     return;
   }
   const measured = profile.measured;
-  out(`Measured ${docs.length} sample(s):`);
+  out(`Measured ${docCount} sample(s):`);
   if (measured) {
     out(`  ${measured.avgSentenceWords} words per sentence`);
     out(`  ${measured.avgParagraphSentences} sentences per paragraph`);

@@ -297,13 +297,27 @@ Seven components, weights summing to 1.0:
 
 | Component | Weight | What it measures |
 |---|---|---|
-| Practical value | 0.18 | Can a developer do something with this on Monday? |
-| Freshness | 0.15 | Age, on a 7-day half-life. Undated items get a neutral 50, not zero. |
-| Relevance | 0.15 | Focus-keyword density, source tier, minus marketing noise |
-| Discussion potential | 0.14 | Debate signals — the things that make people reply |
-| Educational value | 0.14 | Depth signals and summary substance |
-| Originality | 0.14 | Falls as cluster size grows and as overlap with your past work grows |
-| Audience fit | 0.10 | Overlap with the subjects your readers follow you for |
+| Audience fit | 0.22 | Overlap with the subjects your readers follow you for |
+| Relevance | 0.18 | Focus-keyword density, source tier, minus marketing noise |
+| Practical value | 0.15 | Can a developer do something with this on Monday? |
+| Freshness | 0.12 | Age, on a 7-day half-life. Undated items get a neutral 50, not zero. |
+| Educational value | 0.12 | Depth signals and summary substance |
+| Originality | 0.11 | Falls as cluster size grows and as overlap with your past work grows |
+| Discussion potential | 0.10 | Debate signals — the things that make people reply |
+
+**Audience fit and relevance carry 40% between them, deliberately.** An earlier
+split gave them 25% and let freshness decide the order: on a live run an Apple
+silicon launch came first and a sponsored listicle third, above every
+on-topic item. Originality was worth 14% while reading 95 for all twelve of the
+top topics — it only moves when several sources carry the same story, which is
+rare once clustering has merged the duplicates.
+
+Focus keywords come in two tiers, in `src/pipeline/signals.ts`. **Core** terms
+(`react`, `hydration`, `core web vitals`, `tsconfig`, `npm`…) are specific to
+web work and count for 20 points each. **Broad** terms (`performance`, `ai`,
+`api`, `production`…) are real focus areas that any technical article also
+matches, and count for 7. Add your own terms to whichever tier fits — this is
+the first place to look if the radar keeps surfacing the wrong subjects.
 
 Plus three derived figures: **LinkedIn score** (weights discussion and audience
 fit), **Medium score** (weights educational and practical value), and
@@ -319,6 +333,7 @@ Every component records its reason. `npm run topic -- <slug>` prints them:
 Freshness 91: published 1 day(s) ago
 Relevance 85: 2 focus keyword(s), primary source
 Originality 79: covered by 2 source(s), 0% overlap with prior work
+Audience fit 55: node.js (plus 1 broad term(s))
 ```
 
 Tune the thresholds in Settings; tune the weights in `src/pipeline/score.ts`.

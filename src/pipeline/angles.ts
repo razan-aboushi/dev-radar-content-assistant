@@ -8,10 +8,17 @@ import type { Angle, AngleKind, Topic, TopicScore } from '../types';
  * decides which angle will land best.
  */
 
-/** Trims a headline into a noun phrase usable inside a generated angle title. */
-/** Verbs that separate the thing being announced from what it did. */
+/**
+ * Verbs that separate the thing being announced from what it did.
+ *
+ * Modals and plain present-tense verbs are included because without them a
+ * headline written as a full sentence came back whole: "Why Your Website
+ * Should Never Stop Changing" produced the subject "Website Should Never Stop
+ * Changing", and the hook read "Website Should Never Stop Changing just
+ * changed."
+ */
 const HEADLINE_VERBS =
-  /\s+(?:makes?|adds?|ships?|introduces?|brings?|gets?|lands?|replaces?|replaced|goes?|hits?|reaches?|drops?|removes?|deprecates?|improves?|fixes?|breaks?|is|are|was|were|now|will)\s+/i;
+  /\s+(?:makes?|adds?|ships?|introduces?|brings?|gets?|lands?|replaces?|replaced|goes?|hits?|reaches?|drops?|removes?|deprecates?|improves?|fixes?|breaks?|passes?|means?|helps?|needs?|works?|comes?|looks?|seems?|keeps?|stops?|should|must|can|could|may|might|does|did|has|have|had|is|are|was|were|now|will)\s+/i;
 
 /** Question and framing openers that are not part of the subject. */
 const LEADING_FRAME =
@@ -27,6 +34,11 @@ export function subjectOf(topic: Pick<Topic, 'title'>): string {
     .trim();
 
   const cleaned = text;
+
+  // Some headlines are two sentences: "Your alt text passes automated checks.
+  // That doesn't mean it works." Only the first one describes the subject.
+  const firstSentence = text.split(/(?<=[.!?])\s+/)[0];
+  if (firstSentence && firstSentence.trim().length >= 12) text = firstSentence.trim();
 
   // Framing is stripped before the colon cut, otherwise "Announcing: React 19
   // ships the compiler" collapses to the word "Announcing".

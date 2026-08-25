@@ -84,8 +84,26 @@ test('community sources score lower confidence than primary', () => {
 test('scoring is deterministic', () => {
   // One fixture, scored twice: calling input() twice would produce two
   // different publishedAt timestamps and a spurious freshness difference.
+  //
+  // `now` is pinned as well. Freshness used to read the clock on every call,
+  // so two calls either side of a millisecond boundary disagreed and this
+  // assertion failed about 2% of the time.
   const fixed = input({
     topic: { ...input().topic, publishedAt: '2026-08-01T00:00:00Z' },
+    now: Date.parse('2026-08-10T00:00:00Z'),
   });
   assert.deepEqual(scoreTopic(1, fixed), scoreTopic(1, fixed));
+});
+
+test('scoring does not drift as the clock advances within a call', () => {
+  const at = (now: number) =>
+    scoreTopic(1, input({
+      topic: { ...input().topic, publishedAt: '2026-08-01T00:00:00Z' },
+      now,
+    }));
+  // Same pinned instant must always give a byte-identical result.
+  const base = Date.parse('2026-08-10T00:00:00Z');
+  for (let i = 0; i < 500; i += 1) assert.deepEqual(at(base), at(base));
+  // A later instant must give a strictly staler score.
+  assert.ok(at(base + 7 * 86_400_000).freshness < at(base).freshness);
 });
