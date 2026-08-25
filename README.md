@@ -517,5 +517,4 @@ when you want it. Wire it to your own cron if you want it daily.
 
 ## License
 
-MIT. Dependencies are `better-sqlite3` (MIT) and `fast-xml-parser` (MIT), plus
-TypeScript, tsx and type definitions as dev dependencies (all MIT or Apache-2.0).
+[MIT](LICENSE) © [Razan Aboushi](https://github.com/razan-aboushi)
