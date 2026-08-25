@@ -351,7 +351,10 @@ window.DEV_RADAR_I18N.en = {
     errOllamaOrigin: 'Ollama refused the request. Restart it with OLLAMA_ORIGINS set to this site, as shown in Settings.',
     openSettings: 'Open Settings',
     noPrompt: 'This topic was published without generation data. Refresh the radar and try again.',
-    errNoKey: 'No API key yet. Add one in Settings.',
+    // Names both ways out. The old wording said only "add an API key",
+    // which sent people hunting for a credential when the local-model
+    // option needs none.
+    errNoKey: 'No model connected yet. In Settings, either paste a free API key, or choose Ollama to use a model on your own machine — that one needs no key.',
     errInvalidKey: 'That key was rejected. Check it in Settings, or create a new one.',
     errRateLimited: 'The free tier is rate limited right now. Wait a minute and try again.',
     errBadModel: 'That model is not available. Open Settings and press Save and test to pick from the live list.',
