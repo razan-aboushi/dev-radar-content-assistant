@@ -115,6 +115,12 @@ jobs:
           key: radar-db-${{ github.run_id }}
 
       - uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on by itself the first time this runs, so a fresh
+          # clone needs no click in repository settings. Without it the very
+          # first run fails with "Get Pages site failed. Not Found", which
+          # reads like a broken workflow rather than a missing setting.
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

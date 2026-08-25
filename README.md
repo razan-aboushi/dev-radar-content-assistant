@@ -92,12 +92,15 @@ npm run site            # build the static site into site/
 npm run site:preview    # check it at http://127.0.0.1:4312
 ```
 
-To publish it, push to GitHub and turn Pages on:
+To publish it, just push. The workflow in `.github/workflows/radar.yml` enables
+Pages on its first run, so there is nothing to click:
 
-1. **Settings → Pages → Source → GitHub Actions.** That is the only setting.
-2. Push. The workflow in `.github/workflows/radar.yml` runs, and your radar is
-   live at `https://<your-username>.github.io/<repo-name>/`.
+1. Push to `main`.
+2. Your radar goes live at `https://<your-username>.github.io/<repo-name>/`.
 3. It refreshes itself at **05:15 UTC every day**. Nothing to keep awake.
+
+If your organisation blocks the workflow from enabling Pages, set it by hand
+once: **Settings → Pages → Source → GitHub Actions**.
 
 **This costs nothing and always will.** Actions minutes are unlimited on public
 repositories and Pages is free for them. There is no server, no database host
