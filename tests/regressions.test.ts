@@ -18,6 +18,7 @@ import { createTestDb, setSetting } from '../src/db';
 import { insertItems, listScoredTopics } from '../src/db/repositories';
 import { buildTopics } from '../src/pipeline/run';
 import { loadProfile } from '../src/writing/style';
+import { selectHashtags } from '../src/writing/context';
 import type { NormalizedItem, SourceConfig, StoredItem } from '../src/types';
 
 /**
@@ -260,4 +261,34 @@ test('listScoredTopics returns scores carrying their own topic id', () => {
   // The join aliases topic_id, so this used to come back undefined.
   assert.equal(row.score.topicId, row.topic.id);
   db.close();
+});
+
+/* ------------------------------------------------------------- hashtags */
+
+test('hashtags are not picked from fragments of unrelated words', () => {
+  const profile = loadProfile();
+  const topic = {
+    id: 1, itemId: null, slug: 'why-your-website-should-never-stop-changing',
+    title: 'Why Your Website Should Never Stop Changing',
+    // "again" contains "ai", which used to select #AI on a frontend article.
+    summary: 'It will never be this good again. The site keeps working, but the market moves.',
+    category: 'frontend' as const, sourceKey: 'smashing', sourceUrl: 'https://x/a',
+    sourceTier: 'reputable' as const, publishedAt: null, createdAt: '2026-08-25T00:00:00Z',
+    status: 'new' as const, corroborationUrls: [], rejectionReason: null,
+  };
+  const tags = selectHashtags(profile, topic);
+  assert.ok(!tags.includes('#AI'), `#AI should not be selected, got ${tags.join(' ')}`);
+});
+
+test('a genuinely AI-related topic still gets #AI', () => {
+  const profile = loadProfile();
+  const topic = {
+    id: 2, itemId: null, slug: 'ai-code-review',
+    title: 'AI code review in practice',
+    summary: 'What an LLM catches and what it misses when reviewing a pull request.',
+    category: 'ai-for-developers' as const, sourceKey: 'x', sourceUrl: 'https://x/b',
+    sourceTier: 'reputable' as const, publishedAt: null, createdAt: '2026-08-25T00:00:00Z',
+    status: 'new' as const, corroborationUrls: [], rejectionReason: null,
+  };
+  assert.ok(selectHashtags(profile, topic).includes('#AI'));
 });

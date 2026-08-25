@@ -3,8 +3,7 @@ import { listAngles, listFacts, listPriorContent } from '../db/repositories';
 import { checkRepeat } from '../pipeline/dedupe';
 import { recommendedAngle, subjectOf } from '../pipeline/angles';
 import { assertableFacts, renderClaim } from '../pipeline/verify';
-import { CATEGORY_KEYWORDS } from '../pipeline/signals';
-import { haystack } from '../pipeline/signals';
+import { CATEGORY_KEYWORDS, haystack, matchesPhrase } from '../pipeline/signals';
 import type { Angle, AngleKind, Fact, StyleProfile, Topic, TopicScore } from '../types';
 
 /**
@@ -77,6 +76,22 @@ function dedupe(values: string[]): string[] {
 }
 
 /**
+ * Relates a hashtag to one of its category's keywords.
+ *
+ * Bare substring containment let two-letter terms match almost anything — "ai"
+ * is inside "container", so a CSS article picked up #AI — so a short term has
+ * to match exactly. Digits are kept when stripping punctuation, otherwise
+ * "es2024" collapsed to "es" and matched just as loosely.
+ */
+function relatesTo(term: string, keyword: string): boolean {
+  const bare = keyword.replace(/[^a-z0-9]/g, '');
+  if (!bare) return false;
+  if (bare === term) return true;
+  const [shorter, longer] = bare.length < term.length ? [bare, term] : [term, bare];
+  return shorter.length >= 4 && longer.includes(shorter);
+}
+
+/**
  * Hashtags are chosen by matching the topic text against the same category
  * keyword dictionary the scorer uses, so they describe the post rather than
  * chasing reach. Capped at 8 per the brief.
@@ -86,11 +101,13 @@ export function selectHashtags(profile: StyleProfile, topic: Topic): string[] {
   const scored = profile.preferredHashtags.map((tag) => {
     const term = tag.replace(/^#/, '').toLowerCase();
     let weight = 0;
-    if (hay.includes(term)) weight += 10;
+    // Word edges, for the same reason the scorer needs them: "ai" matched
+    // inside "again" and tagged a frontend article #AI.
+    if (matchesPhrase(hay, term)) weight += 10;
     for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
       if (category !== topic.category) continue;
       for (const keyword of keywords) {
-        if (term.includes(keyword.replace(/[^a-z]/g, '')) || keyword.includes(term)) weight += 6;
+        if (relatesTo(term, keyword)) weight += 6;
       }
     }
     return { tag, weight };
