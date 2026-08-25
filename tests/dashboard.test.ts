@@ -487,10 +487,12 @@ test('action feedback is reported beside the control, not only in the flash bar'
   const body = generate.slice(0, generate.indexOf('\n}\n'));
   assert.ok(body.includes('panelStatus('), 'generate() does not report into the panel');
 
-  // And the missing-key case must be caught before any request is attempted.
+  // And the case where no model can be reached must be caught before any
+  // request is attempted. `ready` rather than `hasKey`: a local Ollama needs
+  // no key, so requiring one would block a provider that works.
   assert.ok(
-    /!window\.dataSource\.canWrite && !window\.aiClient\.hasKey/.test(body),
-    'generate() does not short-circuit when there is no key',
+    /!window\.dataSource\.canWrite && !window\.aiClient\.ready/.test(body),
+    'generate() does not short-circuit when no model is reachable',
   );
   // The message must carry the action that fixes it.
   assert.ok(body.includes("t('ai.openSettings')"), 'the failure offers no way forward');

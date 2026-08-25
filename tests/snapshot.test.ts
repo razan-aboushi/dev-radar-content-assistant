@@ -548,12 +548,28 @@ test('every topic in the snapshot carries prompts for both languages', () => {
 
 /* ------------------------------------------------------- AI presets */
 
-test('the browser provider list matches the server preset list exactly', () => {
-  // Two lists, one truth. A provider added to one and not the other either
+test('every server preset is offered in the browser, on the same terms', () => {
+  // Two lists, one truth. A hosted provider in one and not the other either
   // cannot be selected or is selected and then fails.
+  //
+  // The browser may carry extra entries the server does not: Ollama is handled
+  // by its own provider class in ai/provider.ts rather than as an
+  // OpenAI-compatible preset, so it is browser-only here and must be local.
   const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
   const browserNames = [...ai.matchAll(/^\s{4}(\w+): \{$/gm)].map((m) => m[1]!);
-  assert.deepEqual(browserNames.sort(), Object.keys(FREE_PROVIDER_PRESETS).sort());
+
+  for (const name of Object.keys(FREE_PROVIDER_PRESETS)) {
+    assert.ok(browserNames.includes(name), `${name} is configurable on the server but not in the browser`);
+  }
+  for (const name of browserNames) {
+    if (name in FREE_PROVIDER_PRESETS) continue;
+    const block = ai.slice(ai.indexOf(`    ${name}: {`));
+    assert.match(
+      block.slice(0, block.indexOf('},')),
+      /local: true/,
+      `${name} is browser-only but not marked local`,
+    );
+  }
 
   for (const [name, preset] of Object.entries(FREE_PROVIDER_PRESETS)) {
     assert.ok(ai.includes(`baseUrl: '${preset.baseUrl}'`), `${name} baseUrl differs`);

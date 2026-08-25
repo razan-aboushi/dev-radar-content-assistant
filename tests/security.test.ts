@@ -119,18 +119,28 @@ test('the policy names the AI endpoints and nothing else', () => {
 
   assert.deepEqual(connect.slice().sort(), [
     "'self'",
+    // Loopback only. A local Ollama is reachable without a key, and browsers
+    // treat 127.0.0.1 as trustworthy, so this widens nothing on the network.
+    'http://127.0.0.1:11434',
+    'http://localhost:11434',
     'https://api.cerebras.ai',
     'https://api.groq.com',
     'https://generativelanguage.googleapis.com',
     'https://openrouter.ai',
   ]);
 
+  // Nothing but loopback may be reached over plain http.
+  for (const origin of connect) {
+    if (origin === "'self'" || origin.startsWith('https://')) continue;
+    assert.match(origin, /^http:\/\/(127\.0\.0\.1|localhost):/, `insecure origin allowed: ${origin}`);
+  }
+
   // Every origin the client can actually call must be in that list.
   const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
   for (const url of [...ai.matchAll(/baseUrl:\s*'([^']+)'/g)].map((m) => m[1]!)) {
     const origin = new URL(url).origin;
     assert.ok(connect.includes(origin), `${origin} is called but not allowed by the policy`);
-    assert.match(url, /^https:/, `${url} must be https`);
+    assert.match(url, /^(https:|http:\/\/(127\.0\.0\.1|localhost):)/, `${url} must be https or loopback`);
   }
 });
 

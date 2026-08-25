@@ -812,6 +812,7 @@ function aiSettings() {
   select.addEventListener('change', () => {
     window.aiClient.setProvider(select.value);
     updatePrivacy();
+    syncKeyRow();
     const info = window.aiClient.providers[select.value];
     keyLink.href = safeUrl(info.keyUrl);
     keyLink.textContent = t('ai.getKey', { provider: info.label });
@@ -833,6 +834,20 @@ function aiSettings() {
       placeholder: window.aiClient.hasKey ? '••••••••••••••••' : '',
     },
   });
+  // A local model has no credential to enter, so the field is not shown at all
+  // rather than sitting there implying one is required.
+  const syncKeyRow = () => {
+    const local = !window.aiClient.needsKey;
+    keyRow.hidden = local;
+    localNote.hidden = !local;
+  };
+  const localNote = el('div', { class: 'callout callout--action ai-local-note' }, [
+    el('p', {}, [
+      document.createTextNode(`${t('ai.localIntro')} `),
+      el('code', { text: `OLLAMA_ORIGINS=${window.location.origin}`, attrs: { dir: 'ltr' } }),
+      document.createTextNode(` ${t('ai.localRestart')}`),
+    ]),
+  ]);
   const keyLink = el('a', { text: t('ai.getKey', { provider: window.aiClient.providerInfo.label }) });
   keyLink.href = safeUrl(window.aiClient.providerInfo.keyUrl);
   keyLink.target = '_blank';
@@ -842,6 +857,8 @@ function aiSettings() {
   keyRow.appendChild(keyInput);
   keyRow.appendChild(el('span', { class: 'hint' }, [keyLink]));
   wrap.appendChild(keyRow);
+  wrap.appendChild(localNote);
+  syncKeyRow();
 
   /*
     The model picker.
@@ -887,7 +904,7 @@ function aiSettings() {
             const button = event.currentTarget;
             return withBusy(button, t('ai.testing'), async () => {
               if (keyInput.value.trim()) window.aiClient.setKey(keyInput.value.trim());
-              if (!window.aiClient.hasKey) {
+              if (!window.aiClient.ready) {
                 flash(t('ai.errNoKey'), 'error');
                 return;
               }
@@ -1184,7 +1201,7 @@ function renderTopic(body, data) {
   // Generating works on the published site too — the browser calls a free AI
   // API with a key you keep in this browser. Only the actions that need a
   // database (rejecting a topic) are limited to the local build.
-  const canGenerate = window.dataSource.canWrite || window.aiClient.hasKey;
+  const canGenerate = window.dataSource.canWrite || window.aiClient.ready;
 
   const actions = [
     el('button', {
@@ -1496,6 +1513,8 @@ function aiErrorMessage(error) {
     network: 'ai.errNetwork',
     empty: 'ai.errEmpty',
     malformed: 'ai.errEmpty',
+    ollamaDown: 'ai.errOllamaDown',
+    ollamaOrigin: 'ai.errOllamaOrigin',
   };
   const key = error && error.reason ? reasons[error.reason] : null;
   return key ? t(key) : error.message;
@@ -1508,7 +1527,7 @@ async function generate(topicId, kind, angle, button, detail) {
   // Nothing can be written without a model. Say so where the button is, and
   // offer the one action that fixes it, rather than failing into a message
   // in another column.
-  if (!window.dataSource.canWrite && !window.aiClient.hasKey) {
+  if (!window.dataSource.canWrite && !window.aiClient.ready) {
     panelStatus(t('ai.errNoKey'), 'error', {
       label: t('ai.openSettings'),
       onClick: () => void show('settings'),

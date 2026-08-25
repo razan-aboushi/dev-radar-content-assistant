@@ -66,6 +66,24 @@
       keyUrl: 'https://cloud.cerebras.ai',
       trainsOnInput: false,
     },
+    /*
+      Your own machine. No key, no account, no signup — Ollama exposes an
+      OpenAI-compatible endpoint on 11434, so it needs no special handling.
+
+      Two caveats worth knowing before choosing it. It only answers while your
+      laptop is awake with Ollama running, which is the opposite of why this
+      site exists. And Ollama refuses cross-origin requests by default, so it
+      has to be told this site is allowed; the UI explains how when you pick it.
+    */
+    ollama: {
+      label: 'Ollama (on your machine)',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      model: 'llama3.1:8b',
+      keyUrl: 'https://ollama.com/download',
+      trainsOnInput: false,
+      local: true,
+      needsKey: false,
+    },
   };
 
   function read(key) {
@@ -131,7 +149,11 @@
   }
 
   /** Turns a failed call into something that says what to do about it. */
-  function describe(status, body) {
+  function describe(status, body, provider) {
+    // A local Ollama answers 403 when it has not been told this origin is
+    // allowed. That is a one-line setting, not a bad key, and saying "your key
+    // was rejected" would send you looking in entirely the wrong place.
+    if (provider && provider.local && status === 403) return 'ollamaOrigin';
     if (status === 401 || status === 403) return 'invalidKey';
     if (status === 429) return 'rateLimited';
     if (status === 404) return 'badModel';
@@ -149,9 +171,10 @@
 
   async function chat(options) {
     var provider = PROVIDERS[options.provider || providerName()];
-    var key = options.apiKey || read(KEY_STORAGE);
     if (!provider) throw failure('noProvider');
-    if (!key) throw failure('noKey');
+    var key = options.apiKey || read(KEY_STORAGE);
+    // A local model needs no credential; requiring one would be theatre.
+    if (!key && provider.needsKey !== false) throw failure('noKey');
 
     var controller = new AbortController();
     // Long, because a full article on a busy free tier is not quick. Still
@@ -165,10 +188,9 @@
       response = await fetch(provider.baseUrl + '/chat/completions', {
         method: 'POST',
         signal: controller.signal,
-        headers: {
-          'content-type': 'application/json',
-          authorization: 'Bearer ' + key,
-        },
+        headers: key
+          ? { 'content-type': 'application/json', authorization: 'Bearer ' + key }
+          : { 'content-type': 'application/json' },
         body: JSON.stringify({
           model: options.model || currentModel(options.provider),
           temperature: options.temperature === undefined ? 0.85 : options.temperature,
@@ -180,13 +202,16 @@
         }),
       });
     } catch (error) {
-      throw failure(error && error.name === 'AbortError' ? 'timeout' : 'network');
+      if (error && error.name === 'AbortError') throw failure('timeout');
+      // A local endpoint that cannot be reached means Ollama is not running,
+      // which is a different problem from the internet being down.
+      throw failure(provider.local ? 'ollamaDown' : 'network');
     } finally {
       clearTimeout(timer);
     }
 
     var text = await response.text();
-    if (!response.ok) throw failure(describe(response.status, text), text.slice(0, 200));
+    if (!response.ok) throw failure(describe(response.status, text, provider), text.slice(0, 200));
 
     var parsed;
     try {
@@ -219,6 +244,16 @@
       return Boolean(read(KEY_STORAGE));
     },
 
+    /** Whether the current provider can be called at all right now. */
+    get ready() {
+      var provider = PROVIDERS[providerName()];
+      return provider.needsKey === false || Boolean(read(KEY_STORAGE));
+    },
+
+    get needsKey() {
+      return PROVIDERS[providerName()].needsKey !== false;
+    },
+
     get model() {
       return currentModel();
     },
@@ -243,18 +278,18 @@
     listModels: async function () {
       var provider = PROVIDERS[providerName()];
       var key = read(KEY_STORAGE);
-      if (!key) throw failure('noKey');
+      if (!key && provider.needsKey !== false) throw failure('noKey');
 
       var response;
       try {
         response = await fetch(provider.baseUrl + '/models', {
-          headers: { authorization: 'Bearer ' + key },
+          headers: key ? { authorization: 'Bearer ' + key } : {},
         });
       } catch (error) {
-        throw failure('network');
+        throw failure(provider.local ? 'ollamaDown' : 'network');
       }
       var text = await response.text();
-      if (!response.ok) throw failure(describe(response.status, text), text.slice(0, 200));
+      if (!response.ok) throw failure(describe(response.status, text, provider), text.slice(0, 200));
 
       var parsed;
       try {

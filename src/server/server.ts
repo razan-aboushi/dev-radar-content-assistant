@@ -100,7 +100,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'content-security-policy':
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
     "connect-src 'self' https://api.groq.com https://generativelanguage.googleapis.com " +
-    'https://openrouter.ai https://api.cerebras.ai; ' +
+    'https://openrouter.ai https://api.cerebras.ai http://127.0.0.1:11434 http://localhost:11434; ' +
     "font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
