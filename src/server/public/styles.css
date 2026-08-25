@@ -815,6 +815,41 @@ h2 {
 
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 
+/* ------------------------------------------------------- AI settings */
+
+.ai-settings { margin-bottom: 26px; }
+.ai-settings .setting { grid-template-columns: minmax(0, 160px) minmax(0, 280px) minmax(0, 1fr); }
+.ai-settings select {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 0;
+}
+.hint--warn { color: var(--warn); }
+.ai-privacy {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 78ch;
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--signal);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.panel-note { line-height: 1.6; }
+
 /* --------------------------------------------------------- static mode */
 
 .mode-banner {

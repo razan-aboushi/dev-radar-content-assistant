@@ -272,6 +272,8 @@ window.DEV_RADAR_I18N.en = {
     generatingArticleFlash: 'Generating the article. A local model can take a minute or two.',
     generatedScaffold: 'No model was reachable, so this is a research scaffold — the facts and angle are filled in, the prose is yours.',
     generatedOk: 'Draft written. Style score {score}/100.',
+    generatedInBrowser: 'Draft written in your browser. The style check and rewrite loop only run on your machine, so read this one closely.',
+    browserNote: 'Written in your browser. Not style-checked.',
     generateFailed: 'Unable to generate. {reason}',
   },
 
@@ -317,9 +319,37 @@ window.DEV_RADAR_I18N.en = {
   static: {
     badge: 'Published snapshot',
     updated: 'Topics refreshed {when}',
-    readOnly: 'This is the published copy, refreshed on a schedule. Running research, editing settings and writing new drafts happen when you run dev-radar on your own machine.',
+    readOnly: 'This is the published copy, refreshed on a schedule. You can browse, rank and generate here; running research and editing settings happen when you run dev-radar on your own machine.',
     readyDrafts: 'Drafts written ahead of time are ready to copy below.',
-    noDrafts: 'No draft was pre-written for this topic. Open it locally to generate one.',
+    noDrafts: 'No draft was pre-written for this topic. Add a free AI key in Settings to write one here.',
+  },
+
+  /* Browser-side generation on the published site. */
+  ai: {
+    heading: 'Writing with AI',
+    intro: 'This published copy has no server, so writing happens in your browser. Add a free API key and the Generate buttons work here exactly as they do on your machine.',
+    provider: 'Provider',
+    key: 'API key',
+    getKey: 'Get a free {provider} key',
+    saveAndTest: 'Save and test',
+    testing: 'Testing…',
+    testOk: 'Connected to {provider}. The Generate buttons are ready.',
+    clearKey: 'Forget key',
+    keyCleared: 'Key removed from this browser.',
+    trains: 'Free tier: this provider may use what you send to improve its products.',
+    doesNotTrain: 'Free tier: this provider does not train on what you send.',
+    privacy: 'The key is stored only in this browser and sent only to the provider you chose. It is never committed, never in the published files, and never sent anywhere else.',
+    needKey: 'Add a free AI key to generate here.',
+    openSettings: 'Open Settings',
+    noPrompt: 'This topic was published without generation data. Refresh the radar and try again.',
+    errNoKey: 'No API key yet. Add one in Settings.',
+    errInvalidKey: 'That key was rejected. Check it in Settings, or create a new one.',
+    errRateLimited: 'The free tier is rate limited right now. Wait a minute and try again.',
+    errBadModel: 'That model is not available on your plan. Pick another provider in Settings.',
+    errProviderDown: 'The provider is having trouble. Try again shortly.',
+    errTimeout: 'The model took too long. Try again, or pick a faster provider.',
+    errNetwork: 'Could not reach the provider. Check your connection.',
+    errEmpty: 'The model returned nothing usable. Try again.',
   },
 
   error: {

@@ -6,6 +6,7 @@ import { buildSystemPrompt } from './style';
 import { buildHook } from './hooks';
 import { detectAiTells, scoreStyle } from './evaluate';
 import { languagePack, QUESTION_MARK } from './languages';
+import { articleSubtitleFor, articleTitleFor } from './titles';
 import { renderFactBlock, type GenerationContext } from './context';
 import type { GeneratedContent, StyleScore } from '../types';
 
@@ -170,6 +171,48 @@ function truncateForPrompt(text: string): string {
 }
 
 /**
+ * A one-call version of the article prompt, for the published site.
+ *
+ * The two-pass approach above exists because a local 7–8B model loses the
+ * thread past roughly 800 tokens. The hosted free models are 70B-class and do
+ * not, and a browser cannot run the second pass anyway without shipping the
+ * outline back and forth. So this asks for the whole article at once and says
+ * exactly what shape it should take.
+ */
+export function buildSinglePassPrompt(
+  context: GenerationContext,
+  hook: string,
+  minWords: number,
+  maxWords: number,
+): string {
+  return [
+    'Write one complete technical article.',
+    '',
+    `TOPIC: ${context.topic.title}`,
+    `SOURCE SAYS: ${context.topic.summary || '(no summary available)'}`,
+    `ANGLE (${context.angle.kind}): ${context.angle.title} — ${context.angle.description}`,
+    '',
+    renderFactBlock(context),
+    '',
+    'STRUCTURE',
+    `1. Open with this line, or something equally sharp in the same spirit: "${hook}"`,
+    '2. Seven to nine sections, each with a "## " markdown heading. Cover, in this order:',
+    '   why this matters, a plain explanation, how it actually works, a real-world',
+    '   scenario, common mistakes, best practices, and a personal takeaway.',
+    '3. Adapt the headings to the topic. Do not use those labels verbatim.',
+    '',
+    'RULES',
+    ...languagePack(context.language).outputRule,
+    `- ${minWords}–${maxWords} words in total.`,
+    '- Do not write a top-level "# " heading; the title is added separately.',
+    '- Include a short, correct code example where it genuinely helps, in a fenced block with a language tag.',
+    '- Never invent an API, a flag or a method you are not certain exists. If unsure, describe it in prose.',
+    '- Do not repeat yourself. Each section must say something the others do not.',
+    '- No preamble and no sign-off. Output the article text only.',
+  ].join('\n');
+}
+
+/**
  * Lines the model writes *about* the outline rather than as part of it.
  *
  * Against a real llama3.1:8b the outline pass answered "Here are the section
@@ -255,41 +298,19 @@ function finish(
 }
 
 /**
- * The headline is written here rather than by the model so it is stable and
- * reviewable. The subject stays in its original form — an Arabic article about
- * React Server Components still calls them React Server Components, because
- * that is what an Arabic-speaking developer searches for.
+ * The headline is written by the tool rather than the model so it is stable
+ * and reviewable, and it lives in titles.ts so the CLI, the scheduled job and
+ * the browser all produce the same one. The subject stays in its original
+ * form — an Arabic article about React Server Components still calls them
+ * React Server Components, because that is what an Arabic-speaking developer
+ * searches for.
  */
 function articleTitle(context: GenerationContext): string {
-  const arabic = context.language === 'ar';
-  switch (context.angle.kind) {
-    case 'opinion':
-      return arabic ? `هل نحتاج ${context.subject} فعلاً؟` : `Do we actually need ${context.subject}?`;
-    case 'educational':
-      return arabic ? `${context.subject}: شرح كما يجب` : `${context.subject}, explained properly`;
-    default:
-      return arabic
-        ? `ما الذي يغيّره ${context.subject} في تطبيق إنتاجي حقيقي`
-        : `What ${context.subject} changes in a real production app`;
-  }
+  return articleTitleFor(context.subject, context.angle.kind, context.language);
 }
 
 function articleSubtitle(context: GenerationContext): string {
-  const arabic = context.language === 'ar';
-  switch (context.angle.kind) {
-    case 'opinion':
-      return arabic
-        ? 'نظرة على ما يحلّه، وما يكلّفه، ومتى يكون الخيار الخاطئ.'
-        : 'A look at what it solves, what it costs, and when it is the wrong call.';
-    case 'educational':
-      return arabic
-        ? 'ما هو، وكيف يعمل، والأجزاء التي يقفز عنها التوثيق.'
-        : 'What it is, how it works, and the parts the docs skip past.';
-    default:
-      return arabic
-        ? 'الأجزاء التي لا تظهر إلا بعد أن يصطدم بها تحميل حقيقي.'
-        : 'The parts that only show up once real traffic hits it.';
-  }
+  return articleSubtitleFor(context.angle.kind, context.language);
 }
 
 /** The no-LLM output: a fully researched outline, honestly labelled as an outline. */

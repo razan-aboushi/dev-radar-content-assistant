@@ -782,10 +782,122 @@ function contentLanguageChooser(onChange) {
   return group;
 }
 
+/**
+ * Where the AI key lives.
+ *
+ * Only shown on the published site: locally the model comes from .env and the
+ * server holds it, which is strictly better than putting it in a browser.
+ */
+function aiSettings() {
+  const wrap = el('div', { class: 'ai-settings' });
+  wrap.appendChild(el('h2', { text: t('ai.heading') }));
+  wrap.appendChild(el('p', { class: 'lede', text: t('ai.intro') }));
+
+  const providerRow = el('div', { class: 'setting' });
+  const select = el('select', { attrs: { id: 'ai-provider' } });
+  for (const [name, info] of Object.entries(window.aiClient.providers)) {
+    const option = el('option', { text: info.label, attrs: { value: name } });
+    if (name === window.aiClient.provider) option.selected = true;
+    select.appendChild(option);
+  }
+
+  const privacyNote = el('span', { class: 'hint' });
+  const updatePrivacy = () => {
+    const info = window.aiClient.providers[select.value];
+    privacyNote.textContent = info.trainsOnInput ? t('ai.trains') : t('ai.doesNotTrain');
+    privacyNote.className = `hint${info.trainsOnInput ? ' hint--warn' : ''}`;
+  };
+  updatePrivacy();
+
+  select.addEventListener('change', () => {
+    window.aiClient.setProvider(select.value);
+    updatePrivacy();
+    const info = window.aiClient.providers[select.value];
+    keyLink.href = safeUrl(info.keyUrl);
+    keyLink.textContent = t('ai.getKey', { provider: info.label });
+  });
+
+  providerRow.appendChild(el('label', { text: t('ai.provider'), attrs: { for: 'ai-provider' } }));
+  providerRow.appendChild(select);
+  providerRow.appendChild(privacyNote);
+  wrap.appendChild(providerRow);
+
+  const keyRow = el('div', { class: 'setting' });
+  const keyInput = el('input', {
+    attrs: {
+      type: 'password',
+      id: 'ai-key',
+      dir: 'ltr',
+      spellcheck: 'false',
+      autocomplete: 'off',
+      placeholder: window.aiClient.hasKey ? '••••••••••••••••' : '',
+    },
+  });
+  const keyLink = el('a', { text: t('ai.getKey', { provider: window.aiClient.providerInfo.label }) });
+  keyLink.href = safeUrl(window.aiClient.providerInfo.keyUrl);
+  keyLink.target = '_blank';
+  keyLink.rel = 'noopener noreferrer';
+
+  keyRow.appendChild(el('label', { text: t('ai.key'), attrs: { for: 'ai-key' } }));
+  keyRow.appendChild(keyInput);
+  keyRow.appendChild(el('span', { class: 'hint' }, [keyLink]));
+  wrap.appendChild(keyRow);
+
+  wrap.appendChild(
+    el('div', { class: 'btn-row' }, [
+      el('button', {
+        class: 'btn',
+        attrs: { type: 'button' },
+        text: t('ai.saveAndTest'),
+        on: {
+          click: (event) => {
+            const button = event.currentTarget;
+            return withBusy(button, t('ai.testing'), async () => {
+              if (keyInput.value.trim()) window.aiClient.setKey(keyInput.value.trim());
+              if (!window.aiClient.hasKey) {
+                flash(t('ai.errNoKey'), 'error');
+                return;
+              }
+              try {
+                await window.aiClient.test();
+                keyInput.value = '';
+                keyInput.setAttribute('placeholder', '••••••••••••••••');
+                flash(t('ai.testOk', { provider: window.aiClient.providerInfo.label }));
+              } catch (error) {
+                flash(aiErrorMessage(error), 'error');
+              }
+            });
+          },
+        },
+      }),
+      window.aiClient.hasKey
+        ? el('button', {
+            class: 'btn',
+            attrs: { type: 'button' },
+            text: t('ai.clearKey'),
+            on: {
+              click: () => {
+                window.aiClient.clearKey();
+                flash(t('ai.keyCleared'));
+                void loadSettings();
+              },
+            },
+          })
+        : null,
+    ]),
+  );
+
+  wrap.appendChild(el('p', { class: 'hint ai-privacy', text: t('ai.privacy') }));
+  return wrap;
+}
+
 async function loadSettings() {
   const data = await call((lang) => window.dataSource.settings(lang));
   const body = document.getElementById('settings-body');
   clear(body);
+
+  // The key only belongs in a browser when there is no server to hold it.
+  if (!window.dataSource.canWrite) body.appendChild(aiSettings());
 
   body.appendChild(el('h2', { text: t('settings.contentLanguageHeading') }));
   body.appendChild(el('p', { class: 'lede', text: t('settings.contentLanguageHint') }));
@@ -1009,61 +1121,70 @@ function renderTopic(body, data) {
     }),
   );
 
-  // On the published copy there is no model and no database, so the controls
-  // that would write are left out entirely and replaced with a line saying
-  // where the drafts come from.
-  if (window.dataSource.canWrite) {
-    // The content language sits with the generate buttons, not buried in
-    // Settings, because this is the moment the choice is actually made.
-    body.appendChild(el('h2', { text: t('settings.contentLanguageHeading') }));
-    body.appendChild(contentLanguageChooser());
+  // The content language sits with the generate buttons, not buried in
+  // Settings, because this is the moment the choice is actually made.
+  body.appendChild(el('h2', { text: t('settings.contentLanguageHeading') }));
+  body.appendChild(contentLanguageChooser());
 
-    body.appendChild(
-      el('div', { class: 'btn-row' }, [
-        el('button', {
-          class: 'btn btn-generate',
-          attrs: { type: 'button' },
-          text: t('topic.generateLinkedIn'),
-          on: {
-            click: (event) => generate(topic.id, 'linkedin', selectedAngle, event.currentTarget),
+  // Generating works on the published site too — the browser calls a free AI
+  // API with a key you keep in this browser. Only the actions that need a
+  // database (rejecting a topic) are limited to the local build.
+  const canGenerate = window.dataSource.canWrite || window.aiClient.hasKey;
+
+  const actions = [
+    el('button', {
+      class: 'btn btn-generate',
+      attrs: { type: 'button' },
+      text: t('topic.generateLinkedIn'),
+      on: { click: (event) => generate(topic.id, 'linkedin', selectedAngle, event.currentTarget, data) },
+    }),
+    el('button', {
+      class: 'btn btn-generate',
+      attrs: { type: 'button' },
+      text: t('topic.generateMedium'),
+      on: { click: (event) => generate(topic.id, 'medium', selectedAngle, event.currentTarget, data) },
+    }),
+  ];
+
+  if (window.dataSource.canWrite) {
+    actions.push(
+      el('button', {
+        class: 'btn',
+        attrs: { type: 'button' },
+        text: t('topic.reject'),
+        on: {
+          click: (event) => {
+            const button = event.currentTarget;
+            // Previously an unhandled promise: a failure here changed nothing
+            // on screen and reported nothing at all.
+            return withBusy(button, t('topic.rejecting'), async () => {
+              await call(() =>
+                window.dataSource.setTopicStatus(topic.id, 'rejected', 'Rejected by hand'),
+              );
+              flash(t('topic.rejected'));
+              await refresh();
+            });
           },
-        }),
-        el('button', {
-          class: 'btn btn-generate',
-          attrs: { type: 'button' },
-          text: t('topic.generateMedium'),
-          on: {
-            click: (event) => generate(topic.id, 'medium', selectedAngle, event.currentTarget),
-          },
-        }),
-        el('button', {
-          class: 'btn',
-          attrs: { type: 'button' },
-          text: t('topic.reject'),
-          on: {
-            click: (event) => {
-              const button = event.currentTarget;
-              // Previously an unhandled promise: a failure here changed nothing
-              // on screen and reported nothing at all.
-              return withBusy(button, t('topic.rejecting'), async () => {
-                await call(() =>
-                  window.dataSource.setTopicStatus(topic.id, 'rejected', 'Rejected by hand'),
-                );
-                flash(t('topic.rejected'));
-                await refresh();
-              });
-            },
-          },
-        }),
-      ]),
-    );
-  } else {
-    body.appendChild(
-      el('p', {
-        class: 'kv panel-note',
-        text: drafts.length > 0 ? t('static.readyDrafts') : t('static.noDrafts'),
+        },
       }),
     );
+  }
+
+  body.appendChild(el('div', { class: 'btn-row' }, actions));
+
+  // No key yet on the published site: say what to do rather than showing a
+  // button that fails, and link straight to the settings that fix it.
+  if (!canGenerate) {
+    const hint = el('p', { class: 'kv panel-note' }, [
+      document.createTextNode(`${t('ai.needKey')} `),
+      el('button', {
+        class: 'link-button',
+        attrs: { type: 'button' },
+        text: t('ai.openSettings'),
+        on: { click: () => void show('settings') },
+      }),
+    ]);
+    body.appendChild(hint);
   }
 
   const draftsHost = el('div', { attrs: { id: 'drafts-host' } });
@@ -1217,7 +1338,68 @@ function draftNode(draft, extra) {
   return node;
 }
 
-async function generate(topicId, kind, angle, button) {
+/**
+ * Generates in the browser, using prompts the snapshot already carries.
+ *
+ * The prompts were built by the same TypeScript the CLI uses, so this asks a
+ * model for exactly what `npm run generate:linkedin` asks for. What is missing
+ * compared with the local path is the style gate and its rewrite loop, which
+ * needs the scorer; the draft is shown as written, and the panel says so.
+ */
+async function generateInBrowser(topicId, kind, angle, detail) {
+  const language = window.i18n.contentLanguage;
+  const prompts = detail && detail.prompts;
+  if (!prompts || !prompts[kind] || !prompts[kind][angle] || !prompts[kind][angle][language]) {
+    throw new Error(t('ai.noPrompt'));
+  }
+
+  const system = await loadSystemPrompt(language);
+  const titles = (prompts.titles && prompts.titles[angle] && prompts.titles[angle][language]) || {};
+
+  return window.aiClient.generate({
+    topicId,
+    kind,
+    angle,
+    language,
+    system,
+    prompt: prompts[kind][angle][language],
+    hashtags: detail.hashtags || [],
+    sources: detail.sources || [],
+    title: kind === 'medium' ? titles.title : '',
+    subtitle: kind === 'medium' ? titles.subtitle : '',
+  });
+}
+
+/** One system prompt per language for the whole site; fetched once. */
+const systemPromptCache = {};
+async function loadSystemPrompt(language) {
+  if (systemPromptCache[language]) return systemPromptCache[language];
+  const response = await fetch('data/system-prompts.json');
+  if (!response.ok) throw new Error(t('ai.noPrompt'));
+  const all = await response.json();
+  Object.assign(systemPromptCache, all);
+  return systemPromptCache[language];
+}
+
+/** Maps an aiClient failure code onto something worth reading. */
+function aiErrorMessage(error) {
+  const reasons = {
+    noKey: 'ai.errNoKey',
+    noProvider: 'ai.errNoKey',
+    invalidKey: 'ai.errInvalidKey',
+    rateLimited: 'ai.errRateLimited',
+    badModel: 'ai.errBadModel',
+    providerDown: 'ai.errProviderDown',
+    timeout: 'ai.errTimeout',
+    network: 'ai.errNetwork',
+    empty: 'ai.errEmpty',
+    malformed: 'ai.errEmpty',
+  };
+  const key = error && error.reason ? reasons[error.reason] : null;
+  return key ? t(key) : error.message;
+}
+
+async function generate(topicId, kind, angle, button, detail) {
   const isArticle = kind === 'medium';
   const busyLabel = t(isArticle ? 'draft.generatingArticle' : 'draft.generatingPost');
   flash(t(isArticle ? 'draft.generatingArticleFlash' : 'draft.generatingPostFlash'));
@@ -1229,34 +1411,73 @@ async function generate(topicId, kind, angle, button) {
   }
 
   try {
-    const data = await call(() =>
-      window.dataSource.generate({
-        topicId,
-        kind,
-        angle,
-        contentLanguage: window.i18n.contentLanguage,
-      }),
-    );
+    let content;
+    let extra = {};
+
+    if (window.dataSource.canWrite) {
+      const result = await call(() =>
+        window.dataSource.generate({
+          topicId,
+          kind,
+          angle,
+          contentLanguage: window.i18n.contentLanguage,
+        }),
+      );
+      content = result.content;
+      extra = result;
+    } else {
+      content = await generateInBrowser(topicId, kind, angle, detail);
+      content.publishText = renderPublishText(content);
+      content.wordCount = countWords(content.publishText);
+      content.dir = window.i18n.dirFor(content.language);
+      extra = { browserGenerated: true };
+    }
+
     const host = document.getElementById('drafts-host');
-    if (host) host.insertBefore(draftNode(data.content, data), host.firstChild);
+    if (host) host.insertBefore(draftNode(content, extra), host.firstChild);
     flash(
-      data.content.mode === 'scaffold'
+      content.mode === 'scaffold'
         ? t('draft.generatedScaffold')
-        : t('draft.generatedOk', {
-            // A draft written before styleScore existed reads null here, and
-            // dereferencing it took the success message down with it.
-            score: data.content.styleScore ? data.content.styleScore.total : '—',
-          }),
-      data.belowThreshold ? 'warn' : 'ok',
+        : extra.browserGenerated
+          ? t('draft.generatedInBrowser')
+          : t('draft.generatedOk', {
+              // A draft written before styleScore existed reads null here, and
+              // dereferencing it took the success message down with it.
+              score: content.styleScore ? content.styleScore.total : '—',
+            }),
+      extra.belowThreshold ? 'warn' : 'ok',
     );
   } catch (error) {
-    flash(t('draft.generateFailed', { reason: error.message }), 'error');
+    flash(t('draft.generateFailed', { reason: aiErrorMessage(error) }), 'error');
   } finally {
     if (button) {
       button.disabled = false;
       button.textContent = original;
     }
   }
+}
+
+/**
+ * The same assembly as renderPublishText in src/writing/publish.ts. It has to
+ * exist twice because a browser-made draft never passes through the server,
+ * and a test runs both over the same fixtures so they cannot drift.
+ */
+function renderPublishText(content) {
+  if (content.kind === 'linkedin') {
+    const parts = [content.body.trim()];
+    if (content.hashtags.length > 0) parts.push(content.hashtags.join(' '));
+    return parts.join('\n\n');
+  }
+  const parts = [];
+  if (content.title && content.title.trim()) parts.push(`# ${content.title.trim()}`);
+  if (content.subtitle && content.subtitle.trim()) parts.push(`## ${content.subtitle.trim()}`);
+  parts.push(content.body.trim());
+  return parts.join('\n\n');
+}
+
+function countWords(text) {
+  const trimmed = String(text || '').trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
 /* ---------------------------------------------------------- navigation */

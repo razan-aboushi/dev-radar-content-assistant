@@ -10,7 +10,20 @@ import { insertContent, insertItems } from '../src/db/repositories';
 import { buildTopics } from '../src/pipeline/run';
 import { buildSnapshot } from '../src/snapshot';
 import { FREE_PROVIDER_PRESETS } from '../src/config';
-import type { NormalizedItem } from '../src/types';
+import { cleanDraft } from '../src/writing/linkedin';
+import { renderPublishText } from '../src/writing/publish';
+import { loadProfile } from '../src/writing/style';
+import type { GeneratedContent, NormalizedItem } from '../src/types';
+
+function contentFixture(): GeneratedContent {
+  return {
+    topicId: 1, kind: 'medium', angleKind: 'educational', mode: 'llm',
+    hook: 'hook', title: 'A title', subtitle: 'A subtitle',
+    body: '## Section\n\nProse.', hashtags: ['#One', '#Two'], sources: [],
+    styleScore: null, aiTells: [], status: 'draft',
+    createdAt: '2026-08-25T00:00:00Z', model: null, language: 'en',
+  };
+}
 
 /**
  * The published build.
@@ -306,7 +319,247 @@ test('the static build reads per-language report files', async () => {
   assert.ok(requested.includes('data/weekly.en.json'));
 });
 
+/* ------------------------------------------ browser-side generation */
+
+/** Loads ai.js against a fake window with a stubbed fetch. */
+function loadAiClient(options: { response?: unknown; status?: number; store?: Record<string, string> } = {}) {
+  const store = options.store ?? {};
+  const calls: Array<{ url: string; body: any; headers: any }> = [];
+  const win: Record<string, unknown> = {
+    localStorage: {
+      getItem: (k: string) => (Object.prototype.hasOwnProperty.call(store, k) ? store[k]! : null),
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; },
+    },
+    AbortController: globalThis.AbortController,
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+    async fetch(url: string, init: any) {
+      calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
+      const status = options.status ?? 200;
+      const payload = options.response ?? { choices: [{ message: { content: 'Generated body.' } }] };
+      return { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(payload) };
+    },
+  };
+  win.window = win;
+  const context = vm.createContext(win);
+  vm.runInContext(
+    fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8'),
+    context,
+    { filename: 'ai.js' },
+  );
+  return { ai: win.aiClient as any, calls, store };
+}
+
+test('the browser client refuses to call anything without a key', async () => {
+  const { ai, calls } = loadAiClient();
+  assert.equal(ai.hasKey, false);
+  await assert.rejects(
+    () => ai.generate({ kind: 'linkedin', system: 's', prompt: 'p', language: 'en' }),
+    (error: Error & { reason?: string }) => error.reason === 'noKey',
+  );
+  assert.equal(calls.length, 0, 'no request may be made without a key');
+});
+
+test('the key is sent as a bearer token to the chosen provider only', async () => {
+  const { ai, calls } = loadAiClient();
+  ai.setKey('gsk_test_key');
+  ai.setProvider('groq');
+  await ai.generate({ kind: 'linkedin', system: 'sys', prompt: 'prompt', language: 'en', hashtags: [] });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]!.url, 'https://api.groq.com/openai/v1/chat/completions');
+  assert.equal(calls[0]!.headers.authorization, 'Bearer gsk_test_key');
+  assert.equal(calls[0]!.body.messages[0].content, 'sys');
+  assert.equal(calls[0]!.body.messages[1].content, 'prompt');
+});
+
+test('switching provider changes the endpoint and nothing else', async () => {
+  const { ai, calls } = loadAiClient();
+  ai.setKey('k');
+  ai.setProvider('cerebras');
+  await ai.generate({ kind: 'linkedin', system: 's', prompt: 'p', language: 'en', hashtags: [] });
+  assert.match(calls[0]!.url, /^https:\/\/api\.cerebras\.ai\//);
+  assert.equal(ai.setProvider('not-a-provider'), false);
+});
+
+test('provider failures are reported as causes you can act on', async () => {
+  for (const [status, reason] of [[401, 'invalidKey'], [429, 'rateLimited'], [404, 'badModel'], [503, 'providerDown']] as const) {
+    const { ai } = loadAiClient({ status, response: { error: { message: 'nope' } } });
+    ai.setKey('k');
+    await assert.rejects(
+      () => ai.generate({ kind: 'linkedin', system: 's', prompt: 'p', language: 'en' }),
+      (error: Error & { reason?: string }) => {
+        assert.equal(error.reason, reason, `status ${status} should mean ${reason}`);
+        return true;
+      },
+    );
+  }
+});
+
+test('an empty model response is an error, not an empty draft', async () => {
+  const { ai } = loadAiClient({ response: { choices: [{ message: { content: '   ' } }] } });
+  ai.setKey('k');
+  await assert.rejects(
+    () => ai.generate({ kind: 'linkedin', system: 's', prompt: 'p', language: 'en' }),
+    (error: Error & { reason?: string }) => error.reason === 'empty',
+  );
+});
+
+test('a browser-made draft has the same shape the server returns', async () => {
+  const { ai } = loadAiClient();
+  ai.setKey('k');
+  const draft = await ai.generate({
+    topicId: 7, kind: 'medium', angle: 'educational', language: 'ar',
+    system: 's', prompt: 'p', hashtags: ['#a', '#b'], sources: ['https://x/a'],
+    title: 'عنوان', subtitle: 'وصف',
+  });
+  for (const key of ['topicId', 'kind', 'angleKind', 'mode', 'title', 'subtitle', 'body', 'hashtags', 'sources', 'status', 'createdAt', 'language']) {
+    assert.ok(key in draft, `missing ${key}`);
+  }
+  assert.equal(draft.language, 'ar');
+  assert.equal(draft.mode, 'llm');
+  assert.equal(draft.kind, 'medium');
+});
+
+test('the browser and server draft cleaners agree', () => {
+  // Two copies exist because a browser-made draft never passes through the
+  // server. They must behave identically or the published site quietly
+  // produces different text from the CLI.
+  const { ai } = loadAiClient();
+  const fixtures = [
+    '```\nA fenced draft.\n```',
+    "Here's the post you asked for:\n\nReal text.",
+    '«نص عربي هنا.\n\nوسطر آخر.»\n\n#برمجة #ReactJS',
+    'Body text.\n\n#JavaScript #WebDev',
+    'Some **bold** and *italic* text.',
+    'Line one.\n\n\n\n\nLine two.',
+  ];
+  for (const fixture of fixtures) {
+    assert.equal(
+      ai.cleanDraft(fixture),
+      cleanDraft(fixture),
+      `cleaners disagree on: ${JSON.stringify(fixture.slice(0, 40))}`,
+    );
+  }
+});
+
+test('the browser and server publish renderers agree', () => {
+  // Same reasoning: app.js has its own renderPublishText for browser drafts.
+  const app = fs.readFileSync(path.join(config.root, 'src/server/public/app.js'), 'utf8');
+  const source = app.slice(app.indexOf('function renderPublishText'));
+  const body = source.slice(0, source.indexOf('\nfunction countWords'));
+  const browserRender = new Function(`${body}; return renderPublishText;`)() as (c: unknown) => string;
+
+  const cases: GeneratedContent[] = [
+    { ...contentFixture(), kind: 'medium' },
+    { ...contentFixture(), kind: 'medium', subtitle: '' },
+    { ...contentFixture(), kind: 'linkedin', body: 'Post body.' },
+    { ...contentFixture(), kind: 'linkedin', body: 'Post body.', hashtags: [] },
+    { ...contentFixture(), kind: 'medium', body: 'نص عربي 💛', title: 'عنوان', subtitle: 'وصف' },
+  ];
+  for (const content of cases) {
+    assert.equal(
+      browserRender(content),
+      renderPublishText(content),
+      `renderers disagree for ${content.kind}`,
+    );
+  }
+});
+
+test('a long headline never becomes a title with an ellipsis in the middle', async () => {
+  // subjectOf() caps at 70 characters and adds an ellipsis; gluing a template
+  // onto that produced "…as cheaper tools…: explained properly".
+  const { titleSubject, articleTitleFor: titleFor } = await import('../src/writing/titles');
+  const long = 'Anthropic’s best AI model struggles to attract users as cheaper tools…';
+
+  assert.ok(!titleSubject(long).includes('…'));
+  assert.ok(titleSubject(long).length <= 52, titleSubject(long));
+  // Cut on a word boundary, not mid-word.
+  assert.ok(!/\s$/.test(titleSubject(long)));
+
+  for (const language of ['en', 'ar'] as const) {
+    for (const angle of ['educational', 'opinion', 'engineering-lesson'] as const) {
+      const title = titleFor(long, angle, language);
+      assert.ok(!title.includes('…'), `${language}/${angle}: ${title}`);
+      assert.ok(title.length < 120, `${language}/${angle} is too long: ${title}`);
+    }
+  }
+
+  // A short subject is left exactly as it is.
+  assert.equal(titleSubject('React Server Components'), 'React Server Components');
+  assert.equal(titleFor('INP', 'educational', 'en'), 'INP, explained properly');
+});
+
+test('the article titles the browser uses match the ones medium.ts writes', async () => {
+  // prompts.ts mirrors medium.ts so the snapshot can carry titles. If they
+  // drift, a browser-made article gets a different headline from a local one.
+  const db = seededDb();
+  const topicId = (db.prepare('SELECT id FROM topics LIMIT 1').get() as { id: number }).id;
+  const topic = (await import('../src/db/repositories')).getTopic(db, topicId)!;
+  const { buildTopicPrompts } = await import('../src/writing/prompts');
+  const { subjectOf } = await import('../src/pipeline/angles');
+  const { articleTitleFor } = await import('../src/writing/prompts');
+
+  const prompts = buildTopicPrompts(db, topic, loadProfile());
+  const subject = subjectOf(topic);
+  for (const angle of ['educational', 'opinion', 'engineering-lesson'] as const) {
+    for (const language of ['en', 'ar'] as const) {
+      assert.equal(
+        prompts.titles[angle]![language]!.title,
+        articleTitleFor(subject, angle, language),
+      );
+      assert.ok(prompts.linkedin[angle]![language]!.length > 100, 'prompt looks empty');
+      assert.ok(prompts.medium[angle]![language]!.length > 100, 'prompt looks empty');
+    }
+  }
+  db.close();
+});
+
+test('every topic in the snapshot carries prompts for both languages', () => {
+  const db = seededDb();
+  const { dir } = snapshotInto(db);
+  try {
+    const system = readJson<Record<string, string>>(dir, 'system-prompts.json');
+    assert.ok(system.en!.includes('Write in English.'));
+    assert.ok(system.ar!.includes('Write in Arabic.'));
+
+    const topics = readJson<Array<{ topic: { id: number } }>>(dir, 'topics.json');
+    for (const row of topics) {
+      const detail = readJson<{ prompts: { linkedin: any; medium: any } }>(dir, `topic/${row.topic.id}.json`);
+      for (const angle of ['educational', 'opinion', 'engineering-lesson']) {
+        for (const language of ['en', 'ar']) {
+          assert.ok(detail.prompts.linkedin[angle][language], `no linkedin prompt ${angle}/${language}`);
+          assert.ok(detail.prompts.medium[angle][language], `no medium prompt ${angle}/${language}`);
+        }
+      }
+      // Arabic prompts must actually instruct Arabic output.
+      assert.ok(detail.prompts.linkedin.educational.ar.includes('اكتب النص كاملاً بالعربية'));
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    db.close();
+  }
+});
+
 /* ------------------------------------------------------- AI presets */
+
+test('the browser provider list matches the server preset list exactly', () => {
+  // Two lists, one truth. A provider added to one and not the other either
+  // cannot be selected or is selected and then fails.
+  const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
+  const browserNames = [...ai.matchAll(/^\s{4}(\w+): \{$/gm)].map((m) => m[1]!);
+  assert.deepEqual(browserNames.sort(), Object.keys(FREE_PROVIDER_PRESETS).sort());
+
+  for (const [name, preset] of Object.entries(FREE_PROVIDER_PRESETS)) {
+    assert.ok(ai.includes(`baseUrl: '${preset.baseUrl}'`), `${name} baseUrl differs`);
+    assert.ok(ai.includes(`model: '${preset.model}'`), `${name} model differs`);
+    assert.ok(
+      ai.includes(`trainsOnInput: ${preset.trainsOnInput}`),
+      `${name} data policy differs between client and server`,
+    );
+  }
+});
 
 test('every free AI preset is an https OpenAI-compatible endpoint', () => {
   const names = Object.keys(FREE_PROVIDER_PRESETS);

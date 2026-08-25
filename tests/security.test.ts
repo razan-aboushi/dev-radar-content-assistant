@@ -100,12 +100,48 @@ test('every href is filtered through the http/https allowlist', () => {
   assert.ok(app.includes('function safeUrl'), 'safeUrl is gone');
   assert.match(app, /protocol === 'http:' \|\| .*protocol === 'https:'/);
 
-  // Assignments to .href must go through externalLink/safeUrl, never straight
-  // from API data — a javascript: URL in a feed would otherwise be clickable.
-  const rawHrefAssignments = [...app.matchAll(/^\s*(\w+)\.href\s*=\s*(.+);$/gm)].map((m) => m[2]!.trim());
-  for (const value of rawHrefAssignments) {
-    assert.equal(value, 'href', `unchecked href assignment: ${value}`);
+  // Assignments to .href must go through the allowlist, never straight from
+  // API data — a javascript: URL in a feed would otherwise be clickable.
+  const assignments = [...app.matchAll(/^\s*\w+\.href\s*=\s*(.+);$/gm)].map((m) => m[1]!.trim());
+  assert.ok(assignments.length > 0, 'expected at least one href assignment to check');
+  for (const value of assignments) {
+    const validated = value === 'href' || /^safeUrl\(/.test(value);
+    assert.ok(validated, `unchecked href assignment: ${value}`);
   }
+});
+
+test('the policy names the AI endpoints and nothing else', () => {
+  // Browser-side generation posts an API key to a provider. connect-src is
+  // what stops a compromised script from posting it somewhere else instead.
+  const html = fs.readFileSync(path.join(config.root, 'src/server/public/index.html'), 'utf8');
+  const policy = html.match(/Content-Security-Policy" content="([^"]+)"/)![1]!;
+  const connect = policy.match(/connect-src ([^;]+)/)![1]!.trim().split(/\s+/);
+
+  assert.deepEqual(connect.slice().sort(), [
+    "'self'",
+    'https://api.cerebras.ai',
+    'https://api.groq.com',
+    'https://generativelanguage.googleapis.com',
+    'https://openrouter.ai',
+  ]);
+
+  // Every origin the client can actually call must be in that list.
+  const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
+  for (const url of [...ai.matchAll(/baseUrl:\s*'([^']+)'/g)].map((m) => m[1]!)) {
+    const origin = new URL(url).origin;
+    assert.ok(connect.includes(origin), `${origin} is called but not allowed by the policy`);
+    assert.match(url, /^https:/, `${url} must be https`);
+  }
+});
+
+test('the API key is never sent anywhere but the chosen provider', () => {
+  const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
+  // Exactly one fetch, and its URL is built from the preset table.
+  const fetches = [...ai.matchAll(/fetch\(([^,)]+)/g)].map((m) => m[1]!.trim());
+  assert.deepEqual(fetches, ["provider.baseUrl + '/chat/completions'"]);
+  // The key is read from storage and put in an Authorization header only.
+  assert.ok(ai.includes("authorization: 'Bearer ' + key"));
+  assert.ok(!/console\.(log|info|warn|error)\s*\(\s*key/.test(ai), 'the key must never be logged');
 });
 
 /* ----------------------------------------------------------- workflow */

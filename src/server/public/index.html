@@ -18,7 +18,7 @@
   The local server sends the same rules as a real header, plus the
   frame-ancestors directive that meta tags are not allowed to carry.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://api.groq.com https://generativelanguage.googleapis.com https://openrouter.ai https://api.cerebras.ai; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>dev-radar</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%234d7c0f'/></svg>">
@@ -173,6 +173,7 @@
 <script src="i18n/index.js"></script>
 <script src="clipboard.js"></script>
 <script src="data.js"></script>
+<script src="ai.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -148,12 +148,12 @@ function finish(
   };
 }
 
-function buildPrompt(
+export function buildPrompt(
   context: GenerationContext,
   hook: string,
   minWords: number,
   maxWords: number,
-  feedback: string[],
+  feedback: string[] = [],
 ): string {
   const pack = languagePack(context.language);
   const greeting = voiceFor(context.profile, context.language).greeting;

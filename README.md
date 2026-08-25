@@ -107,21 +107,25 @@ repositories and Pages is free for them. There is no server, no database host
 and no cold start — the published site is a handful of JSON files behind a CDN,
 so it opens instantly.
 
-### Want it to write the drafts for you too?
+### Writing on the published site
 
-Optional, and still free. Add one secret and the scheduled job pre-writes a
-LinkedIn post and a Medium article for the top topics, in both languages, so
-they are waiting when you open the site:
+Get a free key from [console.groq.com/keys](https://console.groq.com/keys) — no
+credit card — then use it in either or both of these ways.
 
-1. Get a free key — [console.groq.com/keys](https://console.groq.com/keys),
-   no credit card.
-2. **Settings → Secrets and variables → Actions → New repository secret**,
-   named `AI_API_KEY`.
-3. Optionally set repository *variables* `AI_PROVIDER` (default `groq`) and
-   `AI_MODEL` to pick a different free provider or model.
+**In your browser**, for writing on demand: open the published site → Settings →
+paste the key → Save and test. The Generate buttons then work there, for any
+angle and either language. The key stays in that browser.
 
-Without the secret the radar still publishes; only the pre-written drafts are
-skipped. See [Free AI models](#free-ai-models).
+**As a repository secret**, so drafts are already waiting when you arrive: add
+it under **Settings → Secrets and variables → Actions → New repository secret**,
+named `AI_API_KEY`. The scheduled job then pre-writes a LinkedIn post and a
+Medium article for the top topics in both languages. Optionally set repository
+*variables* `AI_PROVIDER` (default `groq`) and `AI_MODEL` for a different free
+provider or model.
+
+Neither is required. Without a key the radar still publishes; you just get
+topics and scores rather than ready drafts. See
+[Free AI models](#free-ai-models).
 
 ### What the published copy can and cannot do
 
@@ -131,13 +135,30 @@ skipped. See [Free AI models](#free-ai-models).
 | Interest scores and evidence | Yes | Yes |
 | Read and copy pre-written drafts | Yes | Yes |
 | Arabic / English, RTL | Yes | Yes |
+| **Generate a LinkedIn post or Medium article** | **Yes**, with a free key | Yes |
+| Style gate and rewrite loop | No | Yes |
 | Run research on demand | No | Yes |
-| Write a draft for a chosen angle | No | Yes |
 | Change settings, reject topics | No | Yes |
 
-The published copy is read-only by design: there is no database to write to and
-no key in the browser to leak. It says so in a banner rather than showing
-buttons that would fail.
+**The Generate buttons work on the published site too.** There is no server
+there, so the browser calls a free AI API itself. Open **Settings**, pick a
+provider, paste a free key, and the buttons behave exactly as they do locally —
+same prompts, same angles, same two languages, same one-click copy.
+
+The prompts are not rebuilt in JavaScript. They are assembled by the same
+TypeScript the CLI uses and shipped inside each topic's JSON, so the browser
+and the command line ask a model for precisely the same thing.
+
+**Where your key goes:** into this browser's `localStorage`, and to the HTTPS
+endpoint of the provider you chose. Nowhere else. It is never committed, never
+in the published files, and the page's Content-Security-Policy names those four
+provider origins and nothing else — so even a script that somehow ran on the
+page could not post your key to an address of its choosing. "Forget key"
+removes it; there is no second copy.
+
+What the published site cannot do is run the style gate, because that needs the
+scorer. A draft written in the browser says so, and is worth reading closely.
+Running research and editing settings need a database, so they stay local.
 
 ---
 
@@ -779,7 +800,7 @@ npm run typecheck
 npm run build
 ```
 
-220 tests using Node's built-in test runner — no test framework dependency.
+234 tests using Node's built-in test runner — no test framework dependency.
 They cover text utilities, RSS/Atom/GitHub/HN adapter normalisation against
 fixture payloads, clustering and repeat detection, scoring (range, determinism,
 weight sum, decay behaviour), fact extraction and status rules, AI-tell
@@ -809,7 +830,12 @@ orders genuinely differ.
 
 `tests/snapshot.test.ts` covers the published build — that the snapshot has
 every file the dashboard reads, that it contains no secrets or absolute paths,
-and that static filtering and sorting produce the same answers as the SQL.
+that static filtering and sorting produce the same answers as the SQL, and that
+browser-side generation sends the key to the chosen provider and nowhere else.
+It also pins the pieces that necessarily exist twice: the draft cleaner, the
+publish renderer and the article titles are run through both the TypeScript and
+the JavaScript copy over the same fixtures, so the published site cannot
+quietly start producing different text from the CLI.
 
 `tests/security.test.ts` pins the security properties: the CSP allows no inline
 or remote code, cross-origin POSTs are refused, the client uses no HTML sink,

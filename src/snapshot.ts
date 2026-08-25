@@ -16,6 +16,7 @@ import { buildDaily, buildWeekly } from './reports';
 import { buildContext } from './writing/context';
 import { publishWordCount, renderPublishText } from './writing/publish';
 import { languagePack } from './writing/languages';
+import { buildSystemPrompts, buildTopicPrompts } from './writing/prompts';
 import { loadProfile } from './writing/style';
 import type { Language } from './types';
 
@@ -123,8 +124,15 @@ export function buildSnapshot(db: DB, options: SnapshotOptions): SnapshotManifes
       drafts,
       nearMatches: context.nearMatches,
       hashtags: context.hashtags,
+      // Everything the browser needs to ask a model itself, built by the same
+      // code the CLI uses so there is only one definition of the prompt.
+      prompts: buildTopicPrompts(db, row.topic, profile),
+      sources: context.sources,
     });
   }
+
+  // Shared by every topic, so it is fetched once rather than 120 times.
+  writeJson(outDir, 'system-prompts.json', buildSystemPrompts(profile));
 
   writeJson(outDir, 'sources.json', listSources(db));
 

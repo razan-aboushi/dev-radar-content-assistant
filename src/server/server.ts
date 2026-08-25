@@ -94,9 +94,14 @@ function sendJson(response: http.ServerResponse, status: number, data: unknown):
  * frame-ancestors, which a meta tag is not permitted to carry.
  */
 export const SECURITY_HEADERS: Record<string, string> = {
+  // connect-src names the four free AI providers the browser may call when
+  // generating on the published site. Nothing else, so a script that somehow
+  // ran here could not post an API key to an address of its choosing.
   'content-security-policy':
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
-    "connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "connect-src 'self' https://api.groq.com https://generativelanguage.googleapis.com " +
+    'https://openrouter.ai https://api.cerebras.ai; ' +
+    "font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
 };
