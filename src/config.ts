@@ -61,10 +61,65 @@ function int(key: string, fallback: number): number {
 
 export type AiProviderName = 'none' | 'ollama' | 'openai-compatible';
 
+/**
+ * Named shortcuts for the free hosted APIs.
+ *
+ * All of these speak the OpenAI chat-completions protocol, so they need no new
+ * provider class — only a base URL and a sensible default model. Setting
+ * AI_PROVIDER=groq is the same as setting openai-compatible plus two URLs, and
+ * far easier to get right.
+ *
+ * Every one has a standing free tier that needs no credit card. Model names do
+ * change; override with OPENAI_MODEL and check the provider's model list.
+ */
+export const FREE_PROVIDER_PRESETS: Record<
+  string,
+  { baseUrl: string; model: string; label: string; keyUrl: string; trainsOnInput: boolean }
+> = {
+  groq: {
+    baseUrl: 'https://api.groq.com/openai/v1',
+    model: 'llama-3.3-70b-versatile',
+    label: 'Groq',
+    keyUrl: 'https://console.groq.com/keys',
+    trainsOnInput: false,
+  },
+  gemini: {
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    model: 'gemini-2.0-flash',
+    label: 'Google Gemini',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    trainsOnInput: true,
+  },
+  openrouter: {
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'meta-llama/llama-3.3-70b-instruct:free',
+    label: 'OpenRouter',
+    keyUrl: 'https://openrouter.ai/keys',
+    trainsOnInput: false,
+  },
+  cerebras: {
+    baseUrl: 'https://api.cerebras.ai/v1',
+    model: 'llama-3.3-70b',
+    label: 'Cerebras',
+    keyUrl: 'https://cloud.cerebras.ai',
+    trainsOnInput: false,
+  },
+};
+
+function rawProvider(): string {
+  return str('AI_PROVIDER', 'none').toLowerCase().trim();
+}
+
 function providerName(): AiProviderName {
-  const v = str('AI_PROVIDER', 'none').toLowerCase();
+  const v = rawProvider();
   if (v === 'ollama' || v === 'openai-compatible' || v === 'none') return v;
+  if (v in FREE_PROVIDER_PRESETS) return 'openai-compatible';
   return 'none';
+}
+
+/** The preset in play, or null when the provider was configured by hand. */
+function activePreset(): (typeof FREE_PROVIDER_PRESETS)[string] | null {
+  return FREE_PROVIDER_PRESETS[rawProvider()] ?? null;
 }
 
 export const config = {
@@ -84,11 +139,14 @@ export const config = {
   github: { token: str('GITHUB_TOKEN', '') },
   ai: {
     provider: providerName(),
+    /** The preset name when one was used ('groq'), else the provider name. */
+    presetName: activePreset() ? rawProvider() : providerName(),
     ollamaBaseUrl: str('OLLAMA_BASE_URL', 'http://127.0.0.1:11434'),
     ollamaModel: str('OLLAMA_MODEL', 'llama3.1:8b'),
-    openaiBaseUrl: str('OPENAI_BASE_URL', 'http://127.0.0.1:8080/v1'),
-    openaiModel: str('OPENAI_MODEL', 'local-model'),
-    openaiApiKey: str('OPENAI_API_KEY', ''),
+    // A preset supplies the defaults; explicit env vars always win.
+    openaiBaseUrl: str('OPENAI_BASE_URL', activePreset()?.baseUrl ?? 'http://127.0.0.1:8080/v1'),
+    openaiModel: str('OPENAI_MODEL', activePreset()?.model ?? 'local-model'),
+    openaiApiKey: str('OPENAI_API_KEY', str('GROQ_API_KEY', str('GEMINI_API_KEY', ''))),
   },
   server: {
     port: int('PORT', 4311),

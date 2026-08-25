@@ -14,9 +14,14 @@ structured scaffold to write into.
 ## Table of contents
 
 - [Quick start](#quick-start)
+- [Put it online, free, forever](#put-it-online-free-forever)
 - [What it actually does](#what-it-actually-does)
+- [The three numbers](#the-three-numbers)
 - [Every command](#every-command)
 - [The dashboard](#the-dashboard)
+- [Arabic and English](#arabic-and-english)
+- [Copying a finished draft](#copying-a-finished-draft)
+- [Free AI models](#free-ai-models)
 - [Setting up a free local model](#setting-up-a-free-local-model)
 - [Teaching it your voice](#teaching-it-your-voice)
 - [Configuring sources](#configuring-sources)
@@ -78,6 +83,104 @@ limit to 5000/hour.
 
 ---
 
+## Put it online, free, forever
+
+You do not have to run this on your laptop every time you want to look at it.
+
+```bash
+npm run site            # build the static site into site/
+npm run site:preview    # check it at http://127.0.0.1:4312
+```
+
+To publish it, push to GitHub and turn Pages on:
+
+1. **Settings → Pages → Source → GitHub Actions.** That is the only setting.
+2. Push. The workflow in `.github/workflows/radar.yml` runs, and your radar is
+   live at `https://<your-username>.github.io/<repo-name>/`.
+3. It refreshes itself at **05:15 UTC every day**. Nothing to keep awake.
+
+**This costs nothing and always will.** Actions minutes are unlimited on public
+repositories and Pages is free for them. There is no server, no database host
+and no cold start — the published site is a handful of JSON files behind a CDN,
+so it opens instantly.
+
+### Want it to write the drafts for you too?
+
+Optional, and still free. Add one secret and the scheduled job pre-writes a
+LinkedIn post and a Medium article for the top topics, in both languages, so
+they are waiting when you open the site:
+
+1. Get a free key — [console.groq.com/keys](https://console.groq.com/keys),
+   no credit card.
+2. **Settings → Secrets and variables → Actions → New repository secret**,
+   named `AI_API_KEY`.
+3. Optionally set repository *variables* `AI_PROVIDER` (default `groq`) and
+   `AI_MODEL` to pick a different free provider or model.
+
+Without the secret the radar still publishes; only the pre-written drafts are
+skipped. See [Free AI models](#free-ai-models).
+
+### What the published copy can and cannot do
+
+| | Published site | On your machine |
+|---|---|---|
+| Browse and rank topics | Yes | Yes |
+| Interest scores and evidence | Yes | Yes |
+| Read and copy pre-written drafts | Yes | Yes |
+| Arabic / English, RTL | Yes | Yes |
+| Run research on demand | No | Yes |
+| Write a draft for a chosen angle | No | Yes |
+| Change settings, reject topics | No | Yes |
+
+The published copy is read-only by design: there is no database to write to and
+no key in the browser to leak. It says so in a banner rather than showing
+buttons that would fail.
+
+---
+
+## The three numbers
+
+Every topic carries three, and you only need the first one to choose.
+
+| | What it answers | Where it comes from |
+|---|---|---|
+| **Worth writing** | "Should I write this today?" | Fit and interest blended, 60/40 |
+| **Fit for you** | "Is this for my readers?" | The seven-component TOPIC SCORE |
+| **Audience interest** | "Does anyone care?" | Measured engagement, syndication, outlet size, subject demand |
+
+**Audience interest is the one you asked for, and it is not invented.** Every
+point traces to something real:
+
+- **Upvotes and comments** on Hacker News — actual humans, log-scaled, because
+  500 upvotes is about twice as meaningful as 50, not ten times.
+- **GitHub stars** on the project involved.
+- **How many independent outlets** carried the story. If five publications ran
+  it, five editors judged it newsworthy.
+- **How big those outlets are** — the `reach` field in `config/sources.json`,
+  1 to 5, which you can edit.
+- **How many developers work in that subject area** — the demand table in
+  `src/pipeline/interest.ts`, also editable.
+- **How recent it is.** Attention decays.
+
+The evidence sits under every topic, in your language:
+
+> **Major · 87 · ≈60k–250k** — 800 upvotes and 696 comments on Hacker News ·
+> covered by 2 independent sources · ai for developers is a very widely
+> followed subject area
+
+So "87" is never something you have to take on trust. The band and the
+**≈60k–250k** range are a modelled estimate with a deliberately wide error bar;
+the numbers above them are measurements. Nobody can tell you how many people
+will read your post, and this does not pretend to.
+
+**Why blend them.** Sorting by fit alone surfaces a perfectly on-topic release
+note nobody is discussing. Sorting by interest alone surfaces whatever is
+loudest on Hacker News whether or not you have anything to say about it — on a
+real run the top five by interest were all AI chatter scoring in the 30s for
+fit. In the Topics view you can sort by any of the three, or by newest.
+
+---
+
 ## What it actually does
 
 Five stages, each independently inspectable:
@@ -127,6 +230,7 @@ yourself.
 | `npm run generate:linkedin -- <slug>` | Write a LinkedIn post |
 | `npm run generate:medium -- <slug>` | Write a Medium article |
 | `npm run generate:linkedin -- <slug> --angle opinion` | Force a specific angle |
+| `npm run generate:linkedin -- <slug> --language ar` | Write it in Arabic (`en` is the default) |
 | `npm run generate:medium -- <slug> --format json` | Export as `md` (default), `json` or `txt` |
 | `npm run sources` | List sources with status and last fetch |
 | `npm run sources -- --check` | Probe every enabled source end to end and report what works |
@@ -136,6 +240,9 @@ yourself.
 | `npm run style:learn` | Measure your voice from `style/corpus/` |
 | `npm run dashboard` | Web UI on http://127.0.0.1:4311 |
 | `npm run dev` | Alias for `dashboard` |
+| `npm run site` | Build the static site into `site/` for GitHub Pages |
+| `npm run site:preview` | Build it and serve it at http://127.0.0.1:4312 |
+| `npm run pregenerate -- --count 5` | Write drafts ahead of time for the top topics |
 | `npm test` | Build and run the test suite |
 | `npm run typecheck` | Type check without emitting |
 | `npm run build` | Compile to `dist/` |
@@ -153,8 +260,12 @@ npm run dashboard
 
 Six views: **Radar** (today's picks), **Topics** (everything, filterable),
 **Weekly**, **History**, **Sources**, **Settings**. Clicking a topic opens a
-detail panel with the full score breakdown, verified facts, selectable angles
-and the generate buttons.
+detail panel with the full score breakdown, verified facts, selectable angles,
+the content-language choice and the generate buttons.
+
+It's in English or Arabic — see [Arabic and English](#arabic-and-english) — and
+every generated draft has a one-click copy that gives you the whole thing, which
+is [its own section](#copying-a-finished-draft).
 
 The signature element is a **seven-segment score meter** on every topic row — one
 bar per score component, always in the same order. It's there so you can tell at
@@ -171,6 +282,151 @@ read-mostly UI with six screens, a framework would have added hundreds of
 megabytes and a compile cycle for no benefit. The core is fully decoupled from
 the server layer, so if you'd rather have Next.js the swap is contained to
 `src/server/`.
+
+---
+
+## Arabic and English
+
+The dashboard speaks both. The switch is at the top of the sidebar:
+
+```
+EN | العربية
+```
+
+Two things are being chosen here, and they are **deliberately independent**:
+
+| | What it controls | Where you set it |
+|---|---|---|
+| **Interface language** | The dashboard's own labels, buttons and messages | `EN \| العربية` in the sidebar |
+| **Content language** | The language a generated post or article is written in | Next to the Generate buttons, and in Settings |
+
+An Arabic interface writing English posts is a normal thing to want, and so is
+the reverse. Neither setting moves the other, and both survive a refresh —
+they're kept in `localStorage` under `dev-radar.uiLanguage` and
+`dev-radar.contentLanguage`. On a first visit the interface follows your
+browser's language.
+
+### RTL
+
+Choosing Arabic sets `dir="rtl"` and `lang="ar"` on `<html>`, and the whole
+layout mirrors: sidebar, cards, tables, forms, the detail panel, everything.
+That works because the stylesheet uses CSS logical properties throughout
+(`padding-inline-start` rather than `padding-left`), so there is no second
+right-to-left stylesheet to keep in sync. A test fails the build if a physical
+`left`/`right` property creeps back in.
+
+Two things deliberately **do not** mirror:
+
+- **The seven-segment score meter.** It's a chart. Its components are always in
+  the documented order so you can compare two rows at a glance, and the initials
+  under it are rendered one per bar so they line up in either language.
+- **Latin-script text.** Topic titles, URLs, source keys and code identifiers
+  keep their own direction inside Arabic prose, and Arabic drafts read
+  right-to-left inside an English interface. Direction is decided per string,
+  not per page.
+
+### What is and isn't translated
+
+Translated: all dashboard chrome — navigation, headings, buttons, filters,
+settings, source statuses, errors, empty states, loading states, score
+component names, the weekly section headings, and the sentence explaining why a
+topic ranked where it did.
+
+Left alone on purpose: source names, URLs, category slugs (`web-platform`,
+`ai-for-developers` — the taxonomy the tool is configured with, and the words
+developers use anyway), fact claims quoted verbatim from a source, and generated
+draft text, which is in whatever content language you asked for.
+
+Translations live in `src/server/public/i18n/en.js` and `ar.js`, one file per
+language, with the service in `i18n/index.js`. A test walks both files and fails
+if either has a key the other does not.
+
+### Arabic content quality
+
+Arabic drafts are written from scratch in Arabic, not translated from an
+English draft. The model is given explicit rules: Modern Standard Arabic with a
+conversational tone, no literal translation from English, and technical terms
+left in English the way developers actually say them — `JavaScript`, `React`,
+`Node.js`, `Next.js`, `API`, `SEO`, `frontend`, `backend`.
+
+The style gate has its own Arabic pattern set. This matters more than it
+sounds: the English scorer looks for contractions, `you` and `I`, so run against
+Arabic every dimension read zero, every draft failed the gate, and the rewrite
+loop burned three model calls to arrive at the same number. Arabic also ends a
+question with `؟`, which the sentence splitter now knows about.
+
+Arabic quality is bounded by your model. `llama3.1:8b` writes serviceable but
+uneven Arabic; a larger model is noticeably better. The style score is reported
+honestly either way — see [Limitations](#limitations--read-this-one).
+
+---
+
+## Copying a finished draft
+
+Every generated draft has one button that puts the **entire** piece on your
+clipboard:
+
+- **Copy post** — the LinkedIn post: every paragraph, line break, emoji and
+  hashtag, as plain text. LinkedIn renders no markdown, so none is emitted.
+- **Copy article** — the Medium article as canonical Markdown: the title, the
+  subtitle, every heading, every paragraph, bullet and numbered list, and every
+  fenced code block. Markdown is what Medium's import understands, and it is how
+  the body is stored, so nothing is converted on the way out.
+
+What lands on the clipboard is exactly the text rendered above the button —
+both come from the same `renderPublishText()` — so what you read is what you
+paste. Scores, sources, style notes and every other piece of interface furniture
+stay out of it.
+
+Drafts are never collapsed, clipped or hidden behind a "show more". A long
+article is shown in full.
+
+**If copying fails, it says so.** `navigator.clipboard` is not something you can
+assume: it is undefined outside a secure context, and reaching this dashboard
+from your phone at `http://192.168.1.x:4311` is not one, even though
+`http://127.0.0.1` is. So the button tries the modern API, falls back to a
+selected textarea and `execCommand`, and only then reports which step failed and
+why. It never reports success it did not achieve.
+
+The button is a real `<button>` with an `aria-label`, so it is reachable and
+operable from the keyboard, and it confirms with `Copied ✓` before returning to
+its normal label.
+
+---
+
+## Free AI models
+
+Every option here is genuinely free and needs no credit card. Set one in
+`.env` and it works both locally and in the scheduled job.
+
+| Provider | `AI_PROVIDER` | Free limits | Trains on your input? | Get a key |
+|---|---|---|---|---|
+| **Groq** *(recommended)* | `groq` | 30 req/min, 1,000/day | **No** | [console.groq.com/keys](https://console.groq.com/keys) |
+| Google Gemini | `gemini` | Flash models free, limits in AI Studio | **Yes**, on the free tier | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| OpenRouter | `openrouter` | 20 req/min, 50/day | No | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| Cerebras | `cerebras` | 30 req/min | No | [cloud.cerebras.ai](https://cloud.cerebras.ai) |
+| Ollama *(local)* | `ollama` | Unlimited, your hardware | No — never leaves your machine | — |
+
+```ini
+AI_PROVIDER=groq
+OPENAI_API_KEY=gsk_your_key_here
+# OPENAI_MODEL=llama-3.3-70b-versatile   # optional, this is the default
+```
+
+**Groq is the default recommendation** because it does not train on what you
+send it, publishes its limits so you can plan against them, and runs a 70B
+model — a real step up from an 8B model on your laptop. Gemini's free tier is
+excellent and has a much larger context window, but Google may use free-tier
+inputs to improve its products; that matters more for a private draft than for
+a post you are about to publish anyway, so pick knowingly.
+
+All four speak the OpenAI chat protocol, so they share one code path. Model
+names change — override with `OPENAI_MODEL` and check the provider's model list
+if a call starts failing.
+
+Nothing here requires payment, and nothing degrades to a paid tier silently: if
+a provider is unreachable or out of quota, the tool falls back to the labelled
+research scaffold and says so.
 
 ---
 
@@ -256,7 +512,14 @@ rhythm. It cannot tell you whether an idea is any good.
 
 ## Configuring sources
 
-`config/sources.json` holds 27 sources. Each one:
+`config/sources.json` holds **45 sources**, all verified live. Coverage spans
+JavaScript and TypeScript, React, Next.js, Vue, Svelte and Astro, Node, Deno
+and Bun, the web platform, CSS, performance and SEO, **AI for developers**
+(OpenAI, Hugging Face, Stack Overflow, Simon Willison, Hacker News),
+**backend and infrastructure** (Cloudflare, Go, Rust, Kubernetes, Netflix),
+databases, security, and testing.
+
+Each one:
 
 ```json
 {
@@ -267,9 +530,15 @@ rhythm. It cannot tell you whether an idea is any good.
   "tier": "primary",
   "category": "nodejs",
   "enabled": true,
-  "weight": 1.4
+  "weight": 1.4,
+  "reach": 5
 }
 ```
+
+**`weight`** (0.5–1.5) is how well the outlet matches *your* subjects; it
+multiplies relevance. **`reach`** (1–5) is how large the outlet's audience is;
+it feeds audience interest. They are separate on purpose — a niche newsletter
+can be highly relevant to you and still small.
 
 **`kind`** — `rss`, `atom`, `github-releases`, `github-search`, `hackernews`.
 
@@ -284,10 +553,10 @@ rhythm. It cannot tell you whether an idea is any good.
 Community sources surface topics but their claims are never asserted unless a
 higher tier corroborates them.
 
-**`weight`** — nudges relevance scoring. Around 1.0 is neutral.
-
 Changes take effect on the next `npm run radar`. Sources are synced into the
-database by key, so toggling one in the dashboard doesn't get overwritten.
+database by key, and a source you switch off in the dashboard stays off — the
+sync no longer overwrites `enabled` from the file, which it used to do on every
+process start.
 
 ---
 
@@ -371,7 +640,7 @@ Adjust in the dashboard or with `npm run settings`:
 
 | Setting | Default | Effect |
 |---|---|---|
-| `minTopicScore` | 55 | Score needed to be shortlisted automatically |
+| `minTopicScore` | 55 | Minimum **worth-writing** score to be shortlisted or shown on the daily radar |
 | `dailyTopicCount` | 10 | How many topics the daily radar shows |
 | `linkedinMinWords` / `MaxWords` | 150 / 300 | LinkedIn length target |
 | `mediumMinWords` / `MaxWords` | 1000 / 1800 | Medium length target |
@@ -380,7 +649,17 @@ Adjust in the dashboard or with `npm run settings`:
 | `repeatSimilarityThreshold` | 0.55 | Above this vs. past work, a topic is rejected as a repeat |
 | `clusterSimilarityThreshold` | 0.62 | Above this, two items are the same story |
 | `lookbackDays` | 21 | How far back items stay eligible |
-| `enabledCategories` | `*` | Restrict to specific categories |
+| `enabledCategories` | `*` | **Not implemented.** Every category is always considered. |
+
+Numeric settings are validated on save — a value that is not a number, or is
+outside its range, is rejected with a message rather than stored and silently
+ignored. `enabledCategories` is shown struck through in the dashboard with a
+note saying it does nothing, because a setting that looks live and isn't is
+worse than one that is honestly labelled.
+
+The interface and content languages are not in this table: they are per-browser
+preferences, not database settings, so switching machines does not carry them
+over. See [Arabic and English](#arabic-and-english).
 
 ---
 
@@ -411,18 +690,39 @@ src/
   ai/provider.ts      Provider interface, Ollama, OpenAI-compatible, Null
 
   writing/
+    languages.ts      Per-language voice rules, hooks, scaffolds, style patterns
     style.ts          Style profile, corpus measurement, system prompts
     evaluate.ts       AI-tell detection and the nine-dimension style score
     hooks.ts          Hook pattern selection
     context.ts        Assembles everything a generator needs
     linkedin.ts       LinkedIn generation and the rewrite loop
     medium.ts         Medium generation (two-pass)
+    publish.ts        The one definition of "the finished piece"
     export.ts         Writing drafts to md/json/txt
 
   reports.ts          Daily and weekly reports, shared by CLI and dashboard
   cli/index.ts        Command parsing and terminal rendering
-  server/             Dashboard: api.ts, server.ts, public/
+  server/
+    api.ts            JSON handlers
+    server.ts         Static files and routing
+    public/
+      index.html      The whole page
+      app.js          Dashboard client
+      styles.css      One stylesheet, logical properties, no RTL variant
+      clipboard.js    Copy with a fallback chain
+      i18n/           en.js, ar.js, and the language service
 ```
+
+Two of these are load-bearing in a way the names hide.
+
+`writing/publish.ts` holds `renderPublishText()`, the single definition of what
+a finished draft is. The dashboard's `<pre>`, its copy button, the CLI's stdout
+and every file in `out/` all call it, which is what makes "what you see is what
+you paste" true rather than aspirational.
+
+`writing/languages.ts` holds everything that differs between an English draft
+and an Arabic one — prompt rules, hook patterns, scaffold headings, and the
+style-scoring patterns. Nothing in it knows about the dashboard's language.
 
 A modular monolith on purpose. One process, one SQLite file, no queues, no
 containers, no services. It's a personal tool.
@@ -471,10 +771,12 @@ component.
 ## Running the tests
 
 ```bash
-npm test
+npm test          # builds, then runs everything
+npm run typecheck
+npm run build
 ```
 
-97 tests using Node's built-in test runner — no test framework dependency.
+220 tests using Node's built-in test runner — no test framework dependency.
 They cover text utilities, RSS/Atom/GitHub/HN adapter normalisation against
 fixture payloads, clustering and repeat detection, scoring (range, determinism,
 weight sum, decay behaviour), fact extraction and status rules, AI-tell
@@ -482,6 +784,35 @@ detection, style measurement, hook selection, the AI provider wire protocol
 against a stub server, HTTP failure messaging (including telling rate limiting
 apart from a genuine 403), source liveness checks across every adapter kind, and
 full pipeline round trips through an in-memory database.
+
+`tests/languages.test.ts` covers the content-language side: Arabic prompts,
+hooks and scaffolds, the Arabic style patterns, Arabic sentence splitting,
+UTF-8 export round trips, the publish renderer, settings validation, and the
+additive database migration.
+
+`tests/dashboard.test.ts` covers the browser modules without a browser. There is
+no build step in the dashboard, so `i18n`, `clipboard` and the data layer are
+plain scripts that attach one object to `window` — which means they load into a
+`vm` context with a hand-built fake window. That is enough to test dictionary
+coverage, preference persistence, the storage-throws case, and the full
+clipboard fallback chain, and it adds no dependency. It also asserts that the
+stylesheet contains no physical `left`/`right` properties, so RTL cannot
+silently regress.
+
+`tests/interest.test.ts` pins down audience interest: score ranges,
+determinism, that engagement saturates rather than scaling linearly, that
+evidence never claims a number it did not measure, and that the three sort
+orders genuinely differ.
+
+`tests/snapshot.test.ts` covers the published build — that the snapshot has
+every file the dashboard reads, that it contains no secrets or absolute paths,
+and that static filtering and sorting produce the same answers as the SQL.
+
+`tests/security.test.ts` pins the security properties: the CSP allows no inline
+or remote code, cross-origin POSTs are refused, the client uses no HTML sink,
+every `href` goes through the protocol allowlist, and the publishing workflow
+cannot write to the repository or see the AI key outside the one step that
+needs it.
 
 The database tests use `createTestDb()`, an in-memory SQLite instance, so they
 don't touch `data/radar.db`.
@@ -499,11 +830,23 @@ chain, and all 27 return usable items. A full `npm run radar` collected roughly
 `npm run sources -- --check` when something looks quiet, and disable whatever
 fails; fixing one is a one-line JSON edit.
 
-**Prose generation was never run against a real model.** The provider layer is
-tested against a stub that speaks the Ollama and OpenAI-compatible wire
-protocols, so the request shape, response parsing, and error handling are
-verified. Actual output quality from an actual model is not — no model was
-reachable during the build. The scaffold path *was* run end to end and works.
+**Prose generation has now been run against a real model** — `llama3.1:8b`
+through Ollama — in English and in Arabic, for both LinkedIn posts and Medium
+articles. The pipeline works end to end. Output quality is a different question:
+see the two entries below.
+
+**Arabic quality depends heavily on the model.** `llama3.1:8b` produces
+serviceable Arabic that still needs an editor. It occasionally translates a
+technical term that should have stayed in English — one draft rendered
+"hydration boundary" as "حدود الحقن", which is literal and not what an Arabic
+speaker would say. The prompt tells it not to; an 8B model does not always
+listen. A larger model is a real improvement here. Read your drafts.
+
+**The angle titles and score reasons in the topic panel stay English.** They are
+generated by the scorer and stored per topic at scoring time, so translating
+them would mean either re-scoring the database on every language switch or
+restructuring the scorer to emit keys instead of sentences. The daily and weekly
+prose *is* translated, because it is built on read.
 
 **Without a model you get a scaffold, not a post.** It's clearly labelled
 `mode: scaffold — outline, not publishable prose` in both the CLI and the

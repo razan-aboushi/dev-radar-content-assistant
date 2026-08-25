@@ -1,0 +1,333 @@
+/*
+  English dashboard strings.
+
+  Keys are grouped by the screen they appear on. Every key here must also exist
+  in ar.js — a test walks both files and fails on any that is missing, because a
+  half-translated interface is worse than an untranslated one.
+
+  What is deliberately NOT here: source names, URLs, category and status values
+  that come from the database, and generated draft text. Those are data, not
+  interface, and translating them would misrepresent what is stored.
+*/
+window.DEV_RADAR_I18N = window.DEV_RADAR_I18N || {};
+window.DEV_RADAR_I18N.en = {
+  meta: {
+    name: 'English',
+    nativeName: 'English',
+    dir: 'ltr',
+    htmlLang: 'en',
+  },
+
+  app: {
+    title: 'dev-radar',
+    checkingModel: 'checking model…',
+    modelOffline: 'offline',
+    uiLanguage: 'Interface language',
+    switchToArabic: 'Switch interface to Arabic',
+    switchToEnglish: 'Switch interface to English',
+  },
+
+  nav: {
+    sections: 'Sections',
+    radar: 'Radar',
+    topics: 'Topics',
+    weekly: 'Weekly',
+    history: 'History',
+    sources: 'Sources',
+    settings: 'Settings',
+    runResearch: 'Run research',
+    running: 'Fetching…',
+    noRuns: 'No runs yet',
+    lastRun: 'Last run {when} · +{items} items · +{topics} topics',
+  },
+
+  radar: {
+    eyebrow: 'Daily radar',
+    heading: 'Today',
+    loading: 'Loading…',
+    summary: '{count} topic(s) above score {min}, from {considered} considered.',
+    modelConnected: 'A model is connected, so drafts will be written as prose.',
+    modelMissing: 'No model connected — drafts will come out as research scaffolds with the facts filled in.',
+    topPick: '⭐ Top recommendation',
+    suggestedAngle: 'Suggested angle: {angle}',
+    openTopic: 'Open topic',
+    emptyTitle: 'Nothing on the radar yet.',
+    emptyHint: 'Press "Run research" to fetch every source for the first time.',
+    ranResearch: '{ok} source(s) ok, {failed} failed. +{items} items, +{topics} topics, {rejected} rejected as repeats, {rescored} re-scored.',
+    fetching: 'Fetching every enabled source. This takes a moment.',
+  },
+
+  topics: {
+    eyebrow: 'All topics',
+    heading: 'Everything on the radar',
+    minScore: 'Min fit',
+    minInterest: 'Min interest',
+    status: 'Status',
+    statusAny: 'Any',
+    sort: 'Sort by',
+    empty: 'No topics match those filters.',
+    emptyHint: 'Try lowering the minimum fit or interest.',
+  },
+
+  /* The three numbers the whole tool exists to produce. */
+  score: {
+    opportunity: 'Worth writing',
+    opportunityShort: 'pick',
+    opportunityHint: 'Fit for you blended with how many people are paying attention. This is what the list is ranked by.',
+    fit: 'Fit for you',
+    fitShort: 'fit',
+    fitHint: 'How closely this matches the subjects your readers follow you for.',
+    interest: 'Audience interest',
+    interestShort: 'interest',
+    interestHint: 'How many developers are demonstrably paying attention, from upvotes, comments, stars and how many outlets covered it.',
+    reach: '≈{min}–{max} developers reached',
+    reachShort: '≈{min}–{max}',
+    evidence: 'Based on',
+    noInterest: 'Not measured yet — re-run research to score it.',
+  },
+
+  /* The measured facts behind an interest score, assembled from codes. */
+  evidence: {
+    hackerNews: '{points} upvotes and {comments} comments on Hacker News',
+    stars: '{count} GitHub stars',
+    sources: 'covered by {count} independent sources',
+    oneSource: 'covered by one source so far',
+    demand: '{category} is a {level} subject area',
+    noEngagement: 'no public engagement numbers for this story yet',
+  },
+
+  demand: {
+    veryWide: 'very widely followed',
+    wide: 'widely followed',
+    moderate: 'moderately followed',
+    specialised: 'specialised',
+  },
+
+  band: {
+    niche: 'Niche',
+    growing: 'Growing',
+    broad: 'Broad',
+    major: 'Major',
+    nicheHint: 'A small, specific audience. Great for depth, low on reach.',
+    growingHint: 'Real interest building. A solid, safe choice.',
+    broadHint: 'Widely followed. Good reach if you have an angle.',
+    majorHint: 'Everyone is talking about this right now.',
+  },
+
+  sort: {
+    opportunity: 'Best to write',
+    fit: 'Best fit for me',
+    interest: 'Most people care',
+    newest: 'Newest first',
+  },
+
+  /* The "I don't understand this screen" panel. */
+  explain: {
+    open: 'How do I read this?',
+    close: 'Hide',
+    title: 'How to read this screen',
+    intro: 'Every topic carries three numbers. You only need the first one to choose.',
+    oppTitle: 'Worth writing (the big number)',
+    oppBody: 'Fit and interest combined. Start at the top of the list and work down — that is the order worth your time.',
+    fitTitle: 'Fit for you',
+    fitBody: 'How close the subject is to what your readers follow you for. High fit means you already have something to say.',
+    interestTitle: 'Audience interest',
+    interestBody: 'How many developers are actually paying attention, counted from real upvotes, comments, GitHub stars and how many publications covered the story. The evidence is listed under every topic, so the number is never a guess you have to trust.',
+    barsTitle: 'The seven little bars',
+    barsBody: 'The seven parts that make up fit: freshness, relevance, practical value, discussion, educational value, originality and audience fit. Hover any bar to see its name and value.',
+    nextTitle: 'What to do next',
+    nextBody: 'Click a topic, pick an angle, choose your content language, then generate a LinkedIn post or a Medium article. Copy it with one click.',
+  },
+
+  weekly: {
+    eyebrow: 'Weekly developer radar',
+    heading: 'Last 7 days',
+    empty: 'Nothing from the last 7 days yet.',
+  },
+
+  history: {
+    eyebrow: 'History',
+    heading: 'What you have run and written',
+    runs: 'Research runs',
+    runStarted: 'Started',
+    runSources: 'Sources',
+    runNewItems: 'New items',
+    runNewTopics: 'New topics',
+    noRuns: 'No runs yet.',
+    drafts: 'Drafts written',
+    draftDate: 'Date',
+    draftKind: 'Kind',
+    draftLanguage: 'Language',
+    draftMode: 'Mode',
+    draftStyle: 'Style',
+    draftStatus: 'Status',
+    draftTopic: 'Topic',
+    noDrafts: 'Nothing generated yet.',
+    published: 'Published',
+    publishedTopic: 'Topic',
+    publishedCategory: 'Category',
+    noPublished: 'Nothing marked as published yet.',
+    rejected: 'Rejected as repeats',
+    rejectedTopic: 'Topic',
+    rejectedReason: 'Reason',
+    noRejected: 'Nothing rejected.',
+  },
+
+  sources: {
+    eyebrow: 'Sources',
+    heading: 'Where topics come from',
+    lede: 'Turning a source off stops it being fetched. Feed URLs live in config/sources.json.',
+    on: 'On',
+    key: 'Key',
+    name: 'Name',
+    tier: 'Tier',
+    kind: 'Kind',
+    lastFetch: 'Last fetch',
+    neverFetched: 'never fetched',
+    enabled: '{key} enabled',
+    disabled: '{key} disabled',
+    toggleLabel: 'Fetch from {key}',
+    empty: 'No sources configured. Add them to config/sources.json.',
+  },
+
+  settings: {
+    eyebrow: 'Settings',
+    heading: 'Thresholds and targets',
+    provider: 'AI provider: {provider} ({model}). Change it in .env, not here — it needs a restart.',
+    save: 'Save settings',
+    saving: 'Saving…',
+    saved: 'Settings saved. Re-run research to apply scoring changes.',
+    contentLanguageHeading: 'Content language',
+    contentLanguageHint: 'The language new drafts are written in. Independent of the interface language above — an Arabic interface can write English posts and the other way round.',
+    unsupported: 'Not implemented yet. Changing it has no effect.',
+    hints: {
+      minTopicScore: 'Minimum "worth writing" score. Below this a topic is not shortlisted or shown in the daily radar.',
+      dailyTopicCount: 'How many topics the daily radar lists.',
+      linkedinMinWords: 'Lower word bound requested from the model.',
+      linkedinMaxWords: 'Upper word bound requested from the model.',
+      mediumMinWords: 'Lower word bound for articles.',
+      mediumMaxWords: 'Upper word bound for articles.',
+      minStyleScore: 'Drafts below this are rewritten, up to maxStyleRewrites times.',
+      maxStyleRewrites: 'How many times to retry a draft that fails the style gate.',
+      repeatSimilarityThreshold: '0–1. Above this, a topic is rejected as a repeat of past work.',
+      clusterSimilarityThreshold: '0–1. Above this, two articles are treated as the same story.',
+      lookbackDays: 'How far back to consider items when building topics.',
+      enabledCategories: 'Not implemented yet. Every category is always considered.',
+    },
+  },
+
+  topic: {
+    panelLabel: 'Topic detail',
+    close: 'Close',
+    closeLabel: 'Close topic',
+    loading: 'Loading…',
+    score: 'Score {total} · confidence {confidence}',
+    nearMatches: 'Close to work you already published',
+    nearMatch: '{percent}% — {title}',
+    facts: 'Facts ({count})',
+    noFacts: 'Nothing checkable was extracted. Open the source before writing anything factual.',
+    angles: 'Angles',
+    anglesLabel: 'Choose an angle',
+    recommended: 'recommended',
+    hashtags: 'Hashtags',
+    noHashtags: 'None selected for this topic.',
+    generateLinkedIn: 'Generate LinkedIn',
+    generateMedium: 'Generate Medium',
+    reject: 'Reject topic',
+    rejecting: 'Rejecting…',
+    rejected: 'Topic rejected.',
+    scoreUnit: 'score',
+    lowConfidence: 'low confidence {value}',
+    heat: 'heat {value}',
+  },
+
+  draft: {
+    linkedInPost: 'LinkedIn post',
+    mediumArticle: 'Medium article',
+    words: '{count} words',
+    copyPost: 'Copy post',
+    copyArticle: 'Copy article',
+    copyPostLabel: 'Copy the complete LinkedIn post to the clipboard',
+    copyArticleLabel: 'Copy the complete Medium article, as Markdown, to the clipboard',
+    copied: 'Copied ✓',
+    copiedPost: 'The complete post is on your clipboard.',
+    copiedArticle: 'The complete article is on your clipboard, as Markdown.',
+    copyFailed: 'Could not copy: {reason} Select the text and copy it by hand.',
+    markPublished: 'Mark as published',
+    marking: 'Saving…',
+    markedPublished: 'Marked as published and added to your history.',
+    mode: 'Mode: {mode}',
+    scaffoldNote: 'outline, not publishable prose',
+    styleScore: 'Style {score}/100',
+    belowThreshold: 'below your minimum of {min}',
+    flagged: 'Flagged as AI-sounding:',
+    reviewNotes: 'Review notes:',
+    sources: 'Sources:',
+    savedTo: 'Saved to {path}',
+    footnote: 'Nothing is published automatically. Copy it when you are happy with it.',
+    markdownNote: 'Copied as Markdown, which is what Medium\'s import understands.',
+    generatingPost: 'Writing post…',
+    generatingArticle: 'Writing article…',
+    generatingPostFlash: 'Generating the post…',
+    generatingArticleFlash: 'Generating the article. A local model can take a minute or two.',
+    generatedScaffold: 'No model was reachable, so this is a research scaffold — the facts and angle are filled in, the prose is yours.',
+    generatedOk: 'Draft written. Style score {score}/100.',
+    generateFailed: 'Unable to generate. {reason}',
+  },
+
+  /* Closed sets defined by this application, not values from a remote source. */
+  status: {
+    new: 'new',
+    shortlisted: 'shortlisted',
+    drafted: 'drafted',
+    published: 'published',
+    rejected: 'rejected',
+  },
+
+  tier: {
+    primary: 'primary',
+    reputable: 'reputable',
+    community: 'community',
+  },
+
+  meter: {
+    /* One initial per bar, in score order. Purely a visual key for the chart. */
+    legend: 'F R P D E O A',
+    legendLabel: 'Score components: freshness, relevance, practical value, discussion, educational value, originality, audience fit',
+    freshness: 'freshness',
+    relevance: 'relevance',
+    practicalValue: 'practical value',
+    discussionPotential: 'discussion',
+    educationalValue: 'educational value',
+    originality: 'originality',
+    audienceFit: 'audience fit',
+    linkedin: 'LinkedIn',
+    medium: 'Medium',
+  },
+
+  date: {
+    undated: 'undated',
+    today: 'today',
+    yesterday: 'yesterday',
+    daysAgo: '{count}d ago',
+    monthsAgo: '{count}mo ago',
+  },
+
+  /* Shown only on the hosted, read-only build. */
+  static: {
+    badge: 'Published snapshot',
+    updated: 'Topics refreshed {when}',
+    readOnly: 'This is the published copy, refreshed on a schedule. Running research, editing settings and writing new drafts happen when you run dev-radar on your own machine.',
+    readyDrafts: 'Drafts written ahead of time are ready to copy below.',
+    noDrafts: 'No draft was pre-written for this topic. Open it locally to generate one.',
+  },
+
+  error: {
+    notJson: 'Response was not JSON',
+    requestFailed: 'Request failed ({status})',
+    network: 'Could not reach the dashboard server. Is it still running?',
+    clipboardUnavailable: 'this browser blocked clipboard access.',
+    clipboardDenied: 'permission was denied.',
+    clipboardInsecure: 'the clipboard needs a secure context (https or localhost).',
+  },
+};

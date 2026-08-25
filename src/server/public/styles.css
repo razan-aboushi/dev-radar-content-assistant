@@ -9,7 +9,18 @@
 
   No web fonts: this is an offline-first tool, so type personality comes from
   heavy use of the system monospace for every label, number and tag, set
-  against a plain sans for prose.
+  against a plain sans for prose. The system Arabic face is picked up from the
+  same stack, so switching to Arabic needs no download.
+
+  RTL is done with CSS logical properties throughout — `margin-inline-start`
+  rather than `margin-left`, `text-align: start` rather than `left`, `inset-
+  inline-end` rather than `right`. The layout then mirrors itself from the
+  `dir` attribute alone, and there is no second stylesheet to keep in sync.
+
+  The two things logical properties do not cover are handled explicitly at the
+  bottom of this file: the score meter always fills bottom-up and reads
+  left-to-right (it is a chart, not prose), and the row hover nudge moves
+  towards the reader's start edge rather than always to the right.
 */
 
 :root {
@@ -96,9 +107,37 @@ button { font: inherit; cursor: pointer; }
   color: #7d8b98;
 }
 
+/* ------------------------------------------------------ language switch */
+
+.lang-switch {
+  display: flex;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 3px;
+  background: #ffffff10;
+  border-radius: 5px;
+}
+
+.lang-option {
+  flex: 1;
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  padding: 5px 8px;
+  color: #a8b4c0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+.lang-option:hover { background: #ffffff14; color: #fff; }
+.lang-option.is-active { background: var(--signal); color: #fff; }
+/* Arabic needs a touch more room than "EN" and no letter-spacing. */
+.lang-option[lang="ar"] { font-family: var(--sans); font-size: 12.5px; letter-spacing: 0; }
+
 .rail-nav {
   list-style: none;
-  margin: 34px 0 0;
+  margin: 26px 0 0;
   padding: 0;
   flex: 1;
 }
@@ -106,7 +145,7 @@ button { font: inherit; cursor: pointer; }
 
 .rail-link {
   width: 100%;
-  text-align: left;
+  text-align: start;
   background: none;
   border: 0;
   color: #a8b4c0;
@@ -202,15 +241,83 @@ h2 {
   text-transform: none;
 }
 
+/* ------------------------------------------------------------ explainer */
+
+/*
+  "I don't understand some things in it" is a UI problem, not a docs problem.
+  The answer lives on the screen, collapses once read, and stays one click away.
+*/
+.explain {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.explain-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.explain-title {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.explain-toggle {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.explain-toggle:hover { border-color: var(--ink-2); color: var(--ink-2); }
+
+.explain-intro { margin: 14px 0 0; color: var(--ink-2); font-size: 13.5px; }
+
+.explain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px 24px;
+  margin-top: 14px;
+}
+.explain-item h3 {
+  margin: 0 0 3px;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.explain-item p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+
 /* ------------------------------------------------------------- top pick */
 
+/*
+  Prose on one side, the three numbers on the other. As a single text column
+  the panel left roughly half its width empty at desktop size, which is the
+  "why is there so much white space" complaint in its most visible form.
+*/
 .pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: start;
   background: var(--ink);
   color: #fff;
   border-radius: 8px;
-  padding: 24px 26px;
-  margin-bottom: 30px;
+  padding: 22px 26px;
+  margin-bottom: 26px;
 }
+.pick-body { min-width: 0; }
 .pick .eyebrow { color: var(--signal); }
 .pick h3 {
   margin: 4px 0 10px;
@@ -219,60 +326,164 @@ h2 {
   letter-spacing: -0.02em;
   font-weight: 620;
 }
-.pick p { margin: 0 0 6px; color: #b9c4cf; font-size: 14px; }
+.pick p { margin: 0 0 6px; color: #b9c4cf; font-size: 14px; max-width: 68ch; }
 .pick .pick-actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+.pick-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px 22px;
+  padding-inline-start: 26px;
+  border-inline-start: 1px solid #ffffff1f;
+  font-family: var(--mono);
+}
+.pick-figure { text-align: start; }
+.pick-figure b {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #fff;
+}
+.pick-figure span {
+  display: block;
+  margin-top: 5px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8b98a5;
+}
+.pick-reach {
+  grid-column: 1 / -1;
+  margin: 8px 0 0 !important;
+  font-size: 10.5px;
+  color: #8b98a5 !important;
+}
 
 /* ---------------------------------------------------------- topic rows */
 
 .topic-list { list-style: none; margin: 0; padding: 0; }
 
+/*
+  Three columns: the numbers, the substance, the chart.
+
+  The middle column used to stretch against a short headline and leave a wide
+  empty band before the meter — roughly 200px of nothing on every row at
+  desktop width. It now carries the audience evidence line, so the space is
+  filled with the thing you actually need in order to choose: what the score is
+  made of. Nothing was made narrower; the emptiness was given a job.
+*/
 .topic {
   display: grid;
-  grid-template-columns: 62px 1fr auto;
-  gap: 18px;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: 16px;
   align-items: start;
   background: var(--surface);
   border: 1px solid var(--line-soft);
   border-radius: 7px;
-  padding: 16px 18px;
-  margin-bottom: 8px;
-  text-align: left;
+  padding: 14px 16px;
+  margin-bottom: 7px;
+  text-align: start;
   width: 100%;
   transition: border-color .12s ease, transform .12s ease;
 }
 .topic:hover { border-color: var(--signal); transform: translateX(2px); }
+/* minmax(0,…) above plus this stops a long unbroken headline or URL from
+   forcing the whole row wider than the viewport. */
+.topic-main { min-width: 0; overflow-wrap: anywhere; }
 
-.topic-score {
-  font-family: var(--mono);
-  font-size: 25px;
+/* ------------------------------------------------------------- scores */
+
+.topic-scores { font-family: var(--mono); line-height: 1; }
+
+.score-main b {
+  display: block;
+  font-size: 27px;
   font-weight: 700;
   letter-spacing: -0.04em;
-  line-height: 1;
   color: var(--ink);
 }
-.topic-score small {
+.score-main small {
   display: block;
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--muted);
-  margin-top: 5px;
+  color: var(--signal);
+  margin-top: 4px;
 }
 
+.score-split {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.score-split b { color: var(--ink-2); font-weight: 700; font-size: 11px; }
+
 .topic-title {
-  margin: 0 0 5px;
+  margin: 0 0 4px;
   font-size: 15.5px;
   font-weight: 560;
   line-height: 1.35;
   letter-spacing: -0.01em;
 }
-.topic-why { margin: 0; font-size: 13px; color: var(--muted); }
+.topic-why { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+/* ---------------------------------------------------------- interest */
+
+/*
+  The audience strip. Band and score first because that is the decision, then
+  the estimated reach, then the measured facts that produced it. The evidence
+  is the reason this is trustworthy: "interest 87" means nothing on its own,
+  "480 upvotes and 320 comments on Hacker News" is checkable.
+*/
+.topic-interest {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.interest-band {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+}
+.interest-score { font-weight: 700; font-size: 12px; color: var(--ink-2); }
+.interest-reach { color: var(--muted); }
+.interest-evidence {
+  flex: 1 1 100%;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.topic-interest.is-niche   .interest-band { color: var(--muted); }
+.topic-interest.is-growing .interest-band { color: #2563eb; }
+.topic-interest.is-broad   .interest-band { color: var(--signal); }
+.topic-interest.is-major   .interest-band { color: var(--heat); }
+
+.topic-interest--none { color: var(--muted); font-size: 10.5px; font-family: var(--mono); }
 
 .topic-tags {
   display: flex;
   gap: 6px;
-  margin-top: 9px;
+  margin-top: 8px;
   flex-wrap: wrap;
 }
 .tag {
@@ -315,18 +526,20 @@ h2 {
   background: var(--signal);
   border-radius: 1px;
 }
+/* Mirrors .meter exactly, so each initial sits under its own bar. */
 .meter-legend {
+  display: flex;
+  gap: 3px;
   font-family: var(--mono);
   font-size: 9px;
-  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
   margin-top: 7px;
-  text-align: right;
 }
+.meter-legend span { width: 7px; text-align: center; }
 
 .dials { display: flex; gap: 14px; margin-top: 10px; justify-content: flex-end; }
-.dial { text-align: right; font-family: var(--mono); }
+.dial { text-align: end; font-family: var(--mono); }
 .dial b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
 .dial span {
   font-size: 9px;
@@ -341,7 +554,7 @@ h2 {
   width: var(--panel-w);
   flex: 0 0 var(--panel-w);
   background: var(--surface);
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
   height: 100vh;
   position: sticky;
   top: 0;
@@ -397,14 +610,16 @@ h2 {
 }
 
 .fact {
-  border-left: 3px solid var(--line);
-  padding: 6px 0 6px 12px;
+  border-inline-start: 3px solid var(--line);
+  padding: 6px 0;
+  padding-inline-start: 12px;
   margin-bottom: 10px;
   font-size: 13.5px;
+  overflow-wrap: anywhere;
 }
-.fact--verified { border-left-color: var(--signal); }
-.fact--single-source { border-left-color: var(--warn); }
-.fact--unverified { border-left-color: var(--bad); }
+.fact--verified { border-inline-start-color: var(--signal); }
+.fact--single-source { border-inline-start-color: var(--warn); }
+.fact--unverified { border-inline-start-color: var(--bad); }
 .fact-note {
   display: block;
   margin-top: 3px;
@@ -419,7 +634,7 @@ h2 {
 .angle {
   display: block;
   width: 100%;
-  text-align: left;
+  text-align: start;
   font: inherit;
   color: inherit;
   background: var(--paper);
@@ -433,12 +648,39 @@ h2 {
 .angle.is-selected {
   border-color: var(--signal);
   background: #4d7c0f0f;
-  box-shadow: inset 2px 0 0 var(--signal);
+  border-inline-start-width: 3px;
 }
 .angle h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
 .angle p { margin: 0; font-size: 12.5px; color: var(--muted); }
 .angle .kv { margin-top: 6px; }
 .angle.is-selected .kv { color: var(--signal); }
+
+/* -------------------------------------------- content language chooser */
+
+.lang-choice {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 6px;
+  flex-wrap: wrap;
+}
+.lang-choice-option {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: 5px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: var(--sans);
+}
+.lang-choice-option:hover { border-color: var(--ink-2); }
+.lang-choice-option.is-selected {
+  border-color: var(--signal);
+  background: #4d7c0f12;
+  color: #33520a;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------- drafts */
 
 .draft {
   background: var(--surface-2);
@@ -447,24 +689,71 @@ h2 {
   padding: 16px;
   margin-top: 12px;
 }
-.draft pre {
+
+.draft-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.draft-kind {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+  font-weight: 600;
+}
+.draft-head .kv { margin: 0; }
+
+/*
+  The complete draft, always. No max-height, no fade, no "show more": the
+  whole point of generating it is to read it and copy it, and a container that
+  clips an article is a container that hides the part you were about to check.
+
+  `unicode-bidi: plaintext` gives every line its own direction, inferred from
+  its own first strong character. Without it an Arabic article's markdown
+  markers get pushed to the wrong end of the line — `# عنوان` renders with the
+  hash trailing — and a fenced English code block inside Arabic prose is laid
+  out right-to-left. The copied string is unaffected either way; this is what
+  the preview looks like.
+*/
+.draft-text {
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
   font-family: var(--sans);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  padding: 14px 16px;
 }
+
+.btn-copy.is-copied {
+  border-color: var(--signal);
+  background: #4d7c0f12;
+  color: #33520a;
+}
+
 .draft-meta {
   font-family: var(--mono);
   font-size: 10.5px;
   color: var(--muted);
   border-top: 1px solid var(--line-soft);
   padding-top: 10px;
+  overflow-wrap: anywhere;
 }
-.draft-meta ul { margin: 6px 0 0; padding-left: 16px; }
+.draft-meta ul { margin: 6px 0 0; padding-inline-start: 16px; }
 
 /* -------------------------------------------------------------- tables */
+
+/* A table cannot reflow, so on a narrow screen it scrolls inside its own box
+   rather than pushing the page sideways. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 .grid {
   width: 100%;
@@ -476,7 +765,7 @@ h2 {
   overflow: hidden;
 }
 .grid th {
-  text-align: left;
+  text-align: start;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.1em;
@@ -486,10 +775,18 @@ h2 {
   padding: 10px 14px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--surface-2);
+  white-space: nowrap;
 }
-.grid td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.grid td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
 .grid tr:last-child td { border-bottom: 0; }
 .grid .num { font-family: var(--mono); }
+.source-status { max-width: 40ch; }
+.source-status.is-error { color: var(--bad); }
 
 /* ------------------------------------------------------------- buttons */
 
@@ -517,6 +814,27 @@ h2 {
 .btn-ghost:hover { border-color: #fff; }
 
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+
+/* --------------------------------------------------------- static mode */
+
+.mode-banner {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.mode-banner strong {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+  margin-inline-end: 6px;
+}
 
 /* --------------------------------------------------------------- flash */
 
@@ -547,13 +865,13 @@ h2 {
 
 .setting {
   display: grid;
-  grid-template-columns: 240px 120px 1fr;
+  grid-template-columns: minmax(0, 240px) 120px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   padding: 10px 0;
   border-bottom: 1px solid var(--line-soft);
 }
-.setting label { font-family: var(--mono); font-size: 12px; }
+.setting label { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
 .setting input {
   font-family: var(--mono);
   font-size: 12px;
@@ -561,13 +879,50 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--surface);
+  min-width: 0;
 }
 .setting .hint { font-size: 12px; color: var(--muted); }
+
+/* Shown, not hidden: a setting that does nothing yet should say so. */
+.setting.is-unsupported label { color: var(--muted); text-decoration: line-through; }
+.setting.is-unsupported .hint { color: var(--warn); }
+
+/* ---------------------------------------------------------------- RTL */
+
+/*
+  Everything above is direction-agnostic. These are the deliberate exceptions.
+
+  The score meter is a chart. Its bars fill from the bottom and its seven
+  components are always in the documented order, so it must not mirror — a
+  reader comparing two rows needs the freshness bar in the same place in both
+  languages, and the legend under it is written to match.
+*/
+[dir="rtl"] .meter,
+[dir="rtl"] .meter-legend,
+[dir="rtl"] .dials {
+  direction: ltr;
+}
+/* The legend takes no alignment of its own: it has to start exactly where the
+   bars start, or the initials label the wrong components. */
+[dir="rtl"] .dials { justify-content: flex-end; }
+[dir="rtl"] .dial { text-align: right; }
+
+/* The hover nudge follows the reading direction rather than always going right. */
+[dir="rtl"] .topic:hover { transform: translateX(-2px); }
+
+/* Latin-script identifiers keep their own direction inside Arabic prose. */
+[dir="ltr"] { direction: ltr; }
 
 /* --------------------------------------------------------- responsive */
 
 @media (max-width: 1180px) {
-  .panel { position: fixed; right: 0; top: 0; box-shadow: -12px 0 40px #0c111614; z-index: 10; }
+  .panel {
+    position: fixed;
+    inset-inline-end: 0;
+    top: 0;
+    box-shadow: 0 0 40px #0c111624;
+    z-index: 10;
+  }
 }
 
 @media (max-width: 820px) {
@@ -582,15 +937,35 @@ h2 {
   .rail-nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 16px 0; }
   .rail-nav li { margin: 0; }
   .rail-foot { border-top: 0; padding-top: 0; }
+  .lang-switch { max-width: 220px; }
   .main { padding: 24px 18px 60px; }
   .panel { width: 100%; flex: none; }
-  .topic { grid-template-columns: 52px 1fr; }
+  .panel-body { padding: 18px 16px 60px; }
+  .topic { grid-template-columns: 64px minmax(0, 1fr); }
   .topic > :nth-child(3) { grid-column: 1 / -1; }
-  .dials, .meter { justify-content: flex-start; }
-  .setting { grid-template-columns: 1fr; gap: 6px; }
+  /* The scorecard stacks under the prose rather than squeezing it. */
+  .pick { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .pick-numbers {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+    border-top: 1px solid #ffffff1f;
+    padding-top: 16px;
+  }
+  .setting { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  h1 { font-size: 25px; }
+  .draft-text { padding: 12px; }
+}
+
+@media (max-width: 420px) {
+  .main { padding: 20px 12px 48px; }
+  .topic { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .topic-score { display: flex; align-items: baseline; gap: 8px; }
+  .topic-score small { margin-top: 0; }
+  .btn { padding: 7px 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
   .topic:hover { transform: none; }
+  [dir="rtl"] .topic:hover { transform: none; }
 }

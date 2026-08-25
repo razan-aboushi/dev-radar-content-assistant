@@ -4,6 +4,7 @@ import { checkRepeat } from '../pipeline/dedupe';
 import { recommendedAngle, subjectOf } from '../pipeline/angles';
 import { assertableFacts, renderClaim } from '../pipeline/verify';
 import { CATEGORY_KEYWORDS, haystack, matchesPhrase } from '../pipeline/signals';
+import { languagePack, type ContentLanguage } from './languages';
 import type { Angle, AngleKind, Fact, StyleProfile, Topic, TopicScore } from '../types';
 
 /**
@@ -24,6 +25,8 @@ export interface GenerationContext {
   /** Previously published pieces this could echo. Shown as a warning. */
   nearMatches: Array<{ title: string; similarity: number }>;
   profile: StyleProfile;
+  /** The language the draft will be written in. Independent of the UI language. */
+  language: ContentLanguage;
 }
 
 export function buildContext(
@@ -32,6 +35,7 @@ export function buildContext(
   score: TopicScore | null,
   profile: StyleProfile,
   angleKind?: AngleKind,
+  language: ContentLanguage = 'en',
 ): GenerationContext {
   const angles = listAngles(db, topic.id);
   const angle =
@@ -58,6 +62,7 @@ export function buildContext(
     hashtags: selectHashtags(profile, topic),
     nearMatches: repeat.nearMatches,
     profile,
+    language,
   };
 }
 
@@ -125,8 +130,20 @@ export function selectHashtags(profile: StyleProfile, topic: Topic): string[] {
   return picked.slice(0, 8);
 }
 
-/** The fact block handed to the model. Explicit about what may not be asserted. */
+/**
+ * The fact block handed to the model. Explicit about what may not be asserted.
+ *
+ * The claims themselves stay in the language of the source — they are lifted
+ * verbatim precisely so nothing drifts — and the model is told to translate the
+ * meaning rather than paste the sentence into an Arabic paragraph.
+ */
 export function renderFactBlock(context: GenerationContext): string {
+  const foreignSource =
+    context.language !== 'en'
+      ? ['', 'The claims above are quoted from an English source. Express them naturally in ' +
+         `${languagePack(context.language).englishName}; keep every number, version and API name exactly as written.`]
+      : [];
+
   if (context.claims.length === 0) {
     return [
       'VERIFIED CLAIMS: none could be extracted from the source.',
@@ -139,5 +156,6 @@ export function renderFactBlock(context: GenerationContext): string {
     ...context.claims.map((claim, index) => `${index + 1}. ${claim}`),
     '',
     'Anything not on this list must not appear as a fact.',
+    ...foreignSource,
   ].join('\n');
 }

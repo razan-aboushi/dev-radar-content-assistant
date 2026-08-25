@@ -34,7 +34,7 @@ function parseJson<T>(raw: string | null, fallback: T): T {
 
 interface SourceRow {
   key: string; name: string; url: string; kind: string; tier: string;
-  category: string; enabled: number; weight: number; query: string | null;
+  category: string; enabled: number; weight: number; reach: number | null; query: string | null;
   last_fetched_at: string | null; last_status: string | null; last_error: string | null;
 }
 
@@ -54,6 +54,7 @@ function toSource(row: SourceRow): SourceRecord {
     category: row.category as Category,
     enabled: row.enabled === 1,
     weight: row.weight,
+    reach: row.reach ?? 3,
     query: row.query ?? undefined,
     lastFetchedAt: row.last_fetched_at,
     lastStatus: row.last_status,
@@ -266,7 +267,7 @@ interface ScoreRow {
   topic_id: number; freshness: number; relevance: number; practical_value: number;
   discussion_potential: number; educational_value: number; originality: number;
   audience_fit: number; total: number; confidence: number; linkedin_score: number;
-  medium_score: number; controversy: number; reasons: string;
+  medium_score: number; controversy: number; reasons: string; audience: string | null;
 }
 
 function toScore(row: ScoreRow): TopicScore {
@@ -284,6 +285,9 @@ function toScore(row: ScoreRow): TopicScore {
     linkedinScore: row.linkedin_score,
     mediumScore: row.medium_score,
     controversy: row.controversy,
+    // Null on rows scored before audience interest existed; re-running the
+    // radar fills them in.
+    audience: parseJson<TopicScore['audience']>(row.audience ?? null, null),
     reasons: parseJson<string[]>(row.reasons, []),
   };
 }
@@ -292,17 +296,18 @@ export function upsertScore(db: DB, score: TopicScore): void {
   db.prepare(`
     INSERT INTO topic_scores (topic_id, freshness, relevance, practical_value, discussion_potential,
                               educational_value, originality, audience_fit, total, confidence,
-                              linkedin_score, medium_score, controversy, reasons, scored_at)
+                              linkedin_score, medium_score, controversy, reasons, audience, scored_at)
     VALUES (@topic_id, @freshness, @relevance, @practical_value, @discussion_potential,
             @educational_value, @originality, @audience_fit, @total, @confidence,
-            @linkedin_score, @medium_score, @controversy, @reasons, @scored_at)
+            @linkedin_score, @medium_score, @controversy, @reasons, @audience, @scored_at)
     ON CONFLICT(topic_id) DO UPDATE SET
       freshness = excluded.freshness, relevance = excluded.relevance,
       practical_value = excluded.practical_value, discussion_potential = excluded.discussion_potential,
       educational_value = excluded.educational_value, originality = excluded.originality,
       audience_fit = excluded.audience_fit, total = excluded.total, confidence = excluded.confidence,
       linkedin_score = excluded.linkedin_score, medium_score = excluded.medium_score,
-      controversy = excluded.controversy, reasons = excluded.reasons, scored_at = excluded.scored_at
+      controversy = excluded.controversy, reasons = excluded.reasons,
+      audience = excluded.audience, scored_at = excluded.scored_at
   `).run({
     topic_id: score.topicId,
     freshness: score.freshness,
@@ -318,6 +323,7 @@ export function upsertScore(db: DB, score: TopicScore): void {
     medium_score: score.mediumScore,
     controversy: score.controversy,
     reasons: JSON.stringify(score.reasons),
+    audience: score.audience ? JSON.stringify(score.audience) : null,
     scored_at: new Date().toISOString(),
   });
 }
@@ -329,13 +335,34 @@ export function getScore(db: DB, topicId: number): TopicScore | null {
   return row ? toScore(row) : null;
 }
 
+export type TopicSort = 'opportunity' | 'fit' | 'interest' | 'newest';
+
 export interface TopicQuery {
   status?: TopicStatus | 'any';
   minScore?: number;
+  /** Filters on audience interest rather than topical fit. */
+  minInterest?: number;
   category?: Category;
   sinceDays?: number;
   limit?: number;
+  /** Defaults to 'opportunity': the blend of fit and interest. */
+  sort?: TopicSort;
 }
+
+/**
+ * Audience interest is stored as JSON in one column rather than five, so it is
+ * read back out with json_extract for sorting and filtering. SQLite has had
+ * this built in since 3.38 and better-sqlite3 ships far newer.
+ */
+const INTEREST_SQL = "COALESCE(json_extract(s.audience, '$.score'), 0)";
+const FIT_SQL = 'COALESCE(s.total, 0)';
+
+const ORDER_BY: Record<TopicSort, string> = {
+  opportunity: `(${FIT_SQL} * 0.6 + ${INTEREST_SQL} * 0.4) DESC, ${FIT_SQL} DESC`,
+  fit: `${FIT_SQL} DESC`,
+  interest: `${INTEREST_SQL} DESC, ${FIT_SQL} DESC`,
+  newest: 'COALESCE(t.published_at, t.created_at) DESC',
+};
 
 export function listScoredTopics(db: DB, query: TopicQuery = {}): ScoredTopic[] {
   const where: string[] = [];
@@ -350,23 +377,31 @@ export function listScoredTopics(db: DB, query: TopicQuery = {}): ScoredTopic[] 
     params.category = query.category;
   }
   if (typeof query.minScore === 'number') {
-    where.push('COALESCE(s.total, 0) >= @minScore');
+    where.push(`${FIT_SQL} >= @minScore`);
     params.minScore = query.minScore;
+  }
+  if (typeof query.minInterest === 'number') {
+    where.push(`${INTEREST_SQL} >= @minInterest`);
+    params.minInterest = query.minInterest;
   }
   if (typeof query.sinceDays === 'number') {
     where.push('COALESCE(t.published_at, t.created_at) >= @cutoff');
     params.cutoff = new Date(Date.now() - query.sinceDays * 86_400_000).toISOString();
   }
 
+  // Whitelisted lookup, never interpolated from caller input.
+  const orderBy = ORDER_BY[query.sort ?? 'opportunity'] ?? ORDER_BY.opportunity;
+
   const rows = db
     .prepare(
       `SELECT t.*, s.topic_id AS s_topic_id, s.freshness, s.relevance, s.practical_value,
               s.discussion_potential, s.educational_value, s.originality, s.audience_fit,
-              s.total, s.confidence, s.linkedin_score, s.medium_score, s.controversy, s.reasons
+              s.total, s.confidence, s.linkedin_score, s.medium_score, s.controversy,
+              s.reasons, s.audience
        FROM topics t
        LEFT JOIN topic_scores s ON s.topic_id = t.id
        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-       ORDER BY COALESCE(s.total, 0) DESC, COALESCE(t.published_at, t.created_at) DESC
+       ORDER BY ${orderBy}, COALESCE(t.published_at, t.created_at) DESC
        LIMIT @limit`,
     )
     .all({ ...params, limit: query.limit ?? 100 }) as Array<TopicRow & Partial<ScoreRow> & { s_topic_id: number | null }>;
@@ -449,7 +484,7 @@ interface ContentRow {
   id: number; topic_id: number; kind: string; angle_kind: string; mode: string;
   hook: string; title: string; subtitle: string; body: string; hashtags: string;
   sources: string; style_score: string | null; ai_tells: string; status: string;
-  model: string | null; created_at: string;
+  model: string | null; created_at: string; language: string | null;
 }
 
 function toContent(row: ContentRow): GeneratedContent {
@@ -470,6 +505,8 @@ function toContent(row: ContentRow): GeneratedContent {
     status: row.status as GeneratedContent['status'],
     model: row.model,
     createdAt: row.created_at,
+    // Rows written before the column existed are English by definition.
+    language: row.language === 'ar' ? 'ar' : 'en',
   };
 }
 
@@ -477,9 +514,9 @@ export function insertContent(db: DB, content: GeneratedContent): GeneratedConte
   const info = db
     .prepare(
       `INSERT INTO content (topic_id, kind, angle_kind, mode, hook, title, subtitle, body,
-                            hashtags, sources, style_score, ai_tells, status, model, created_at)
+                            hashtags, sources, style_score, ai_tells, status, model, created_at, language)
        VALUES (@topic_id, @kind, @angle_kind, @mode, @hook, @title, @subtitle, @body,
-               @hashtags, @sources, @style_score, @ai_tells, @status, @model, @created_at)`,
+               @hashtags, @sources, @style_score, @ai_tells, @status, @model, @created_at, @language)`,
     )
     .run({
       topic_id: content.topicId,
@@ -497,6 +534,7 @@ export function insertContent(db: DB, content: GeneratedContent): GeneratedConte
       status: content.status,
       model: content.model,
       created_at: content.createdAt,
+      language: content.language ?? 'en',
     });
   return getContent(db, Number(info.lastInsertRowid))!;
 }

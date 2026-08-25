@@ -21,8 +21,10 @@ import { buildDaily, buildWeekly } from '../reports';
 import { checkSource } from '../sources/adapters';
 import { buildContext } from '../writing/context';
 import { exportContent, exportDaily, type ExportFormat } from '../writing/export';
-import { generateLinkedIn, renderForPublishing } from '../writing/linkedin';
+import { CONTENT_LANGUAGES, toContentLanguage, type ContentLanguage } from '../writing/languages';
+import { generateLinkedIn } from '../writing/linkedin';
 import { generateMedium } from '../writing/medium';
+import { publishWordCount, renderPublishText } from '../writing/publish';
 import { learnStyle, loadProfile } from '../writing/style';
 import type { AngleKind, ScoreBreakdown } from '../types';
 
@@ -418,7 +420,10 @@ function cmdSettings(db: DB, args: Args): void {
 async function cmdGenerate(db: DB, args: Args, kind: 'linkedin' | 'medium'): Promise<void> {
   const slug = args.positional[0];
   if (!slug) {
-    out(`Usage: npm run generate:${kind} -- <slug> [--angle educational|opinion|engineering-lesson]`);
+    out(
+      `Usage: npm run generate:${kind} -- <slug> ` +
+        `[--angle educational|opinion|engineering-lesson] [--language en|ar]`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -429,6 +434,16 @@ async function cmdGenerate(db: DB, args: Args, kind: 'linkedin' | 'medium'): Pro
     process.exitCode = 1;
     return;
   }
+
+  // Rejected outright rather than quietly falling back to English: silently
+  // writing the wrong language is worse than refusing.
+  const requestedLanguage = typeof args.flags.language === 'string' ? args.flags.language : 'en';
+  if (!CONTENT_LANGUAGES.includes(requestedLanguage as ContentLanguage)) {
+    out(`Unknown --language "${requestedLanguage}". Expected one of: ${CONTENT_LANGUAGES.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  const language = toContentLanguage(requestedLanguage);
 
   const provider = getProvider();
   const available = await provider.available();
@@ -445,6 +460,7 @@ async function cmdGenerate(db: DB, args: Args, kind: 'linkedin' | 'medium'): Pro
     getScore(db, topic.id),
     loadProfile(),
     typeof args.flags.angle === 'string' ? (args.flags.angle as AngleKind) : undefined,
+    language,
   );
 
   if (context.nearMatches.length > 0) {
@@ -462,20 +478,16 @@ async function cmdGenerate(db: DB, args: Args, kind: 'linkedin' | 'medium'): Pro
 
   const content = result.content;
 
+  // Exactly what renderPublishText produces, so stdout, the file in out/ and
+  // the dashboard's clipboard are the same characters.
   out('─'.repeat(78));
-  if (kind === 'linkedin') {
-    out(renderForPublishing(content));
-  } else {
-    out(`# ${content.title}`);
-    out('');
-    out(`*${content.subtitle}*`);
-    out('');
-    out(content.body);
-  }
+  out(renderPublishText(content));
   out('─'.repeat(78));
   out('');
 
   out(`Mode:        ${content.mode}${content.mode === 'scaffold' ? '  (outline — not publishable prose)' : ''}`);
+  out(`Language:    ${content.language}`);
+  out(`Words:       ${publishWordCount(content)}`);
   out(`Style score: ${content.styleScore?.total ?? '—'}/100${result.belowThreshold ? '  — below your threshold, review before posting' : ''}`);
   if (content.aiTells.length > 0) {
     out('Flagged:');
@@ -557,6 +569,8 @@ function cmdHelp(): void {
   out('  npm run generate:linkedin -- <slug>');
   out('  npm run generate:medium -- <slug>');
   out('      --angle educational|opinion|engineering-lesson');
+  out('      --language en|ar              Language of the draft (default en)');
+  out('      --format md|json|txt          Export format (default md)');
   out('      --publish                     Mark done and add to history');
   out('  npm run sources                   List sources');
   out('  npm run sources -- --check        Test that each feed responds');

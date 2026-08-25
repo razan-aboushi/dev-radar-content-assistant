@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS sources (
   category        TEXT NOT NULL,
   enabled         INTEGER NOT NULL DEFAULT 1,
   weight          REAL NOT NULL DEFAULT 1.0,
+  reach           INTEGER NOT NULL DEFAULT 3,
   query           TEXT,
   last_fetched_at TEXT,
   last_status     TEXT,
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS topic_scores (
   medium_score         REAL NOT NULL,
   controversy          REAL NOT NULL,
   reasons              TEXT NOT NULL DEFAULT '[]',
+  audience             TEXT,
   scored_at            TEXT NOT NULL
 );
 
@@ -112,7 +114,8 @@ CREATE TABLE IF NOT EXISTS content (
   ai_tells    TEXT NOT NULL DEFAULT '[]',
   status      TEXT NOT NULL DEFAULT 'draft',
   model       TEXT,
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  language    TEXT NOT NULL DEFAULT 'en'
 );
 
 CREATE INDEX IF NOT EXISTS idx_content_topic ON content(topic_id);

@@ -255,6 +255,9 @@ export function scoreTopic(topicId: number, input: ScoreInput): TopicScore {
     linkedinScore,
     mediumScore,
     controversy,
+    // Filled in by the pipeline, which has the cluster payloads this function
+    // deliberately does not see: scoreTopic stays a pure function of one topic.
+    audience: null,
     reasons: [
       freshness.reason,
       relevance.reason,
@@ -266,6 +269,24 @@ export function scoreTopic(topicId: number, input: ScoreInput): TopicScore {
       confidence.reason,
     ],
   };
+}
+
+/**
+ * The one number to sort by when you are choosing what to write today.
+ *
+ * TOPIC SCORE answers "is this for my readers?". Audience interest answers "is
+ * anyone talking about it?". Either one alone picks badly: sorting by fit
+ * surfaces a perfect-fit release note nobody is discussing, and sorting by
+ * interest surfaces whatever is loudest on Hacker News regardless of whether
+ * you have anything to say about it. On a real run the top five by interest
+ * were all AI chatter scoring in the 30s for fit.
+ *
+ * Fit is weighted higher because writing well about something you have no
+ * angle on is harder than finding a smaller audience for something you know.
+ */
+export function opportunityScore(score: Pick<TopicScore, 'total' | 'audience'>): number {
+  const interest = score.audience?.score ?? 0;
+  return Math.round(score.total * 0.6 + interest * 0.4);
 }
 
 /** Rounds every numeric field for display without changing stored precision. */

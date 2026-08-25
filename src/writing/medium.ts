@@ -1,11 +1,11 @@
 import { getNumberSetting, type DB } from '../db';
 import { insertContent } from '../db/repositories';
 import { createLogger } from '../logger';
-import { wordCount } from '../util/text';
 import type { AIProvider } from '../ai/provider';
 import { buildSystemPrompt } from './style';
 import { buildHook } from './hooks';
 import { detectAiTells, scoreStyle } from './evaluate';
+import { languagePack, QUESTION_MARK } from './languages';
 import { renderFactBlock, type GenerationContext } from './context';
 import type { GeneratedContent, StyleScore } from '../types';
 
@@ -34,7 +34,13 @@ export async function generateMedium(
   const minWords = getNumberSetting(db, 'mediumMinWords');
   const maxWords = getNumberSetting(db, 'mediumMaxWords');
 
-  const hook = buildHook(context.profile, context.angle.kind, context.topic, context.subject);
+  const hook = buildHook(
+    context.profile,
+    context.angle.kind,
+    context.topic,
+    context.subject,
+    context.language,
+  );
   const title = articleTitle(context);
   const subtitle = articleSubtitle(context);
 
@@ -45,7 +51,7 @@ export async function generateMedium(
   let attempts = 0;
 
   if (usable) {
-    const system = buildSystemPrompt(context.profile);
+    const system = buildSystemPrompt(context.profile, context.language);
     let feedback: string[] = [];
     let best: { body: string; score: StyleScore } | null = null;
 
@@ -101,6 +107,7 @@ async function writeArticle(
     'The sections must cover, in this order: why this matters, a plain explanation,',
     'how it actually works, a real-world scenario, common mistakes, best practices,',
     'and a personal takeaway. Adapt the wording to the topic; do not use those labels verbatim.',
+    ...languagePack(context.language).outputRule,
   ].join('\n');
 
   const outlineRaw = await provider.complete({
@@ -144,6 +151,7 @@ async function writeArticle(
       'Include a short, correct code example where it genuinely helps. Use fenced blocks with a language tag.',
       'Never invent an API, a flag or a method that you are not certain exists. If unsure, describe it in prose instead of writing code.',
       'No preamble. Output the article text only.',
+      ...languagePack(context.language).outputRule,
       index > 0 ? `\nALREADY WRITTEN (do not repeat):\n${truncateForPrompt(parts.join('\n\n'))}` : '',
       feedback.length ? `\nFIX THESE ISSUES FROM THE LAST DRAFT:\n${feedback.map((n) => `- ${n}`).join('\n')}` : '',
     ]
@@ -198,14 +206,16 @@ function evaluate(
   minWords: number,
   maxWords: number,
 ): StyleScore {
+  const rules = languagePack(context.language).style;
   return scoreStyle({
     text,
     profile: context.profile,
     kind: 'medium',
+    language: context.language,
     minWords,
     maxWords,
-    hasPersonalTake: /\b(?:I|my|I've|I'm)\b/.test(text),
-    hasQuestion: /\?/.test(text),
+    hasPersonalTake: rules.firstPerson.test(text),
+    hasQuestion: QUESTION_MARK.test(text),
     hasConcreteDetail: /```|`[^`]+`|\bv?\d+\.\d+/.test(text) || context.claims.length > 0,
   });
 }
@@ -222,7 +232,7 @@ function finish(
   attempts: number,
   belowThreshold: boolean,
 ): MediumResult {
-  const { tells, bannedHits } = detectAiTells(body, context.profile);
+  const { tells, bannedHits } = detectAiTells(body, context.profile, context.language);
   const content = insertContent(db, {
     topicId: context.topic.id,
     kind: 'medium',
@@ -239,29 +249,46 @@ function finish(
     status: 'draft',
     model: mode === 'llm' ? (process.env.AI_PROVIDER ?? 'unknown') : null,
     createdAt: new Date().toISOString(),
+    language: context.language,
   });
   return { content, attempts, belowThreshold };
 }
 
+/**
+ * The headline is written here rather than by the model so it is stable and
+ * reviewable. The subject stays in its original form — an Arabic article about
+ * React Server Components still calls them React Server Components, because
+ * that is what an Arabic-speaking developer searches for.
+ */
 function articleTitle(context: GenerationContext): string {
+  const arabic = context.language === 'ar';
   switch (context.angle.kind) {
     case 'opinion':
-      return `Do we actually need ${context.subject}?`;
+      return arabic ? `هل نحتاج ${context.subject} فعلاً؟` : `Do we actually need ${context.subject}?`;
     case 'educational':
-      return `${context.subject}, explained properly`;
+      return arabic ? `${context.subject}: شرح كما يجب` : `${context.subject}, explained properly`;
     default:
-      return `What ${context.subject} changes in a real production app`;
+      return arabic
+        ? `ما الذي يغيّره ${context.subject} في تطبيق إنتاجي حقيقي`
+        : `What ${context.subject} changes in a real production app`;
   }
 }
 
 function articleSubtitle(context: GenerationContext): string {
+  const arabic = context.language === 'ar';
   switch (context.angle.kind) {
     case 'opinion':
-      return 'A look at what it solves, what it costs, and when it is the wrong call.';
+      return arabic
+        ? 'نظرة على ما يحلّه، وما يكلّفه، ومتى يكون الخيار الخاطئ.'
+        : 'A look at what it solves, what it costs, and when it is the wrong call.';
     case 'educational':
-      return 'What it is, how it works, and the parts the docs skip past.';
+      return arabic
+        ? 'ما هو، وكيف يعمل، والأجزاء التي يقفز عنها التوثيق.'
+        : 'What it is, how it works, and the parts the docs skip past.';
     default:
-      return 'The parts that only show up once real traffic hits it.';
+      return arabic
+        ? 'الأجزاء التي لا تظهر إلا بعد أن يصطدم بها تحميل حقيقي.'
+        : 'The parts that only show up once real traffic hits it.';
   }
 }
 
@@ -272,9 +299,11 @@ export function scaffoldArticle(
   title: string,
   subtitle: string,
 ): string {
+  const strings = languagePack(context.language).scaffold;
+
   const claims = context.claims.length
     ? context.claims.map((claim) => `- ${claim}`).join('\n')
-    : '- (Nothing verifiable was extracted. Read the source before writing any factual statement.)';
+    : strings.articleNoClaims;
 
   const sources = context.sources.map((url) => `- ${url}`).join('\n');
 
@@ -283,46 +312,42 @@ export function scaffoldArticle(
     '',
     hook,
     '',
-    '## Why this matters',
+    `## ${strings.articleWhyThisMatters}`,
     '[Two or three paragraphs. Who hits this problem, and what it costs them.]',
     '',
-    '## What it actually is',
+    `## ${strings.articleWhatItIs}`,
     '[Plain explanation. Assume the reader has seen the headline and nothing else.]',
     '',
-    '### Verified facts you can use',
+    `### ${strings.articleVerifiedFacts}`,
     claims,
     '',
-    '## How it works',
+    `## ${strings.articleHowItWorks}`,
     '[The mechanism. This is where a diagram or a short code example belongs.]',
     '',
     '```ts',
-    '// Replace with a real, verified example. Do not ship untested code.',
+    strings.articleCodePlaceholder,
     '```',
     '',
-    '## A real-world scenario',
-    `[Where you hit ${context.subject} in something you actually shipped. This section is the reason someone reads your version instead of the docs.]`,
+    `## ${strings.articleScenarioHeading}`,
+    strings.articleScenario(context.subject),
     '',
-    '## Common mistakes',
+    `## ${strings.articleMistakes}`,
     '[Three or four. Each one: the mistake, why it looks reasonable, what it costs.]',
     '',
-    '## Best practices',
+    `## ${strings.articleBestPractices}`,
     '[What you would tell a teammate on Monday.]',
     '',
-    '## My takeaway',
+    `## ${strings.articleTakeaway}`,
     '[First person. The thing you changed your mind about.]',
     '',
-    '## Things to remember',
+    `## ${strings.articleRemember}`,
     '[Three short bullets someone can screenshot.]',
     '',
     '---',
     '',
-    '**Sources**',
+    `**${strings.articleSources}**`,
     sources,
     '',
-    `*Draft outline for: ${title}*`,
+    strings.articleOutlineFor(title),
   ].join('\n');
-}
-
-export function mediumWordCount(content: GeneratedContent): number {
-  return wordCount(content.body);
 }

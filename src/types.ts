@@ -35,6 +35,12 @@ export const CATEGORIES: readonly Category[] = [
   'productivity', 'open-source', 'npm', 'career', 'software-engineering',
 ] as const;
 
+/**
+ * The languages the tool speaks. Used for two independent things: the language
+ * the dashboard is displayed in, and the language a draft is written in.
+ */
+export type Language = 'en' | 'ar';
+
 /** How much a source is trusted for factual claims. Drives verification. */
 export type SourceTier = 'primary' | 'reputable' | 'community';
 
@@ -51,6 +57,13 @@ export interface SourceConfig {
   enabled: boolean;
   /** 0.5–1.5. Multiplies relevance; primary sources sit above 1. */
   weight: number;
+  /**
+   * 1–5. How large this outlet's developer audience is, used by audience
+   * interest scoring. Independent of `weight`, which is about topical fit:
+   * a niche newsletter can be highly relevant to you and still small.
+   * Defaults to 3 when absent.
+   */
+  reach?: number;
   /** github-search only. */
   query?: string;
 }
@@ -113,8 +126,38 @@ export interface TopicScore extends ScoreBreakdown {
   linkedinScore: number;
   mediumScore: number;
   controversy: number;
+  /**
+   * How many people are demonstrably paying attention, separate from how well
+   * the topic fits you. Null on rows scored before this existed.
+   */
+  audience: AudienceInterest | null;
   /** Human-readable justification per component. Shown in the dashboard. */
   reasons: string[];
+}
+
+export type InterestBand = 'niche' | 'growing' | 'broad' | 'major';
+
+/**
+ * One measured fact behind an interest score, as a code plus its numbers
+ * rather than a finished sentence.
+ *
+ * Stored structured so the dashboard can render it in whichever language is
+ * selected. The score reasons in TopicScore are English sentences baked in at
+ * scoring time, which is exactly why they cannot be translated without
+ * re-scoring the database; this avoids repeating that mistake.
+ */
+export interface InterestEvidence {
+  code: 'hackerNews' | 'stars' | 'sources' | 'oneSource' | 'demand' | 'noEngagement';
+  params?: Record<string, string | number>;
+}
+
+export interface AudienceInterest {
+  score: number;
+  band: InterestBand;
+  reachMin: number;
+  reachMax: number;
+  /** The measured facts behind the score, never a derived claim. */
+  evidence: InterestEvidence[];
 }
 
 export type AngleKind = 'educational' | 'opinion' | 'engineering-lesson';
@@ -162,6 +205,12 @@ export interface GeneratedContent {
   status: ContentStatus;
   createdAt: string;
   model: string | null;
+  /**
+   * The language the draft is written in, independent of the dashboard's own
+   * language. Stored so history, exports and text direction stay correct after
+   * the UI is switched.
+   */
+  language: 'en' | 'ar';
 }
 
 export interface StyleScore {
@@ -210,6 +259,19 @@ export interface StyleProfile {
   preferredHashtags: string[];
   /** Derived from style/corpus by `npm run style:learn`; null until then. */
   measured: MeasuredStyle | null;
+  /**
+   * Optional Arabic voice overrides. Absent means the defaults in
+   * writing/languages.ts are used, so the file stays valid without it.
+   */
+  arabic?: ArabicStyleProfile;
+}
+
+export interface ArabicStyleProfile {
+  greetings?: string[];
+  signaturePhrases?: string[];
+  /** Same order as hookPatterns; hooks are picked by index per angle. */
+  hookPatterns?: string[];
+  bannedPhrases?: string[];
 }
 
 export interface MeasuredStyle {

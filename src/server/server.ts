@@ -80,6 +80,7 @@ function readBody(request: http.IncomingMessage): Promise<Record<string, unknown
 function sendJson(response: http.ServerResponse, status: number, data: unknown): void {
   const payload = JSON.stringify(data);
   response.writeHead(status, {
+    'x-content-type-options': 'nosniff',
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(payload),
     'cache-control': 'no-store',
@@ -87,13 +88,26 @@ function sendJson(response: http.ServerResponse, status: number, data: unknown):
   response.end(payload);
 }
 
+/**
+ * Sent on every response. The same rules as the meta tag in index.html, which
+ * exists because GitHub Pages cannot set headers; here we can, so we also get
+ * frame-ancestors, which a meta tag is not permitted to carry.
+ */
+export const SECURITY_HEADERS: Record<string, string> = {
+  'content-security-policy':
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
+    "connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+};
+
 function serveStatic(response: http.ServerResponse, pathname: string): void {
-  const root = publicDir();
+  const root = path.resolve(publicDir());
   const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   const resolved = path.resolve(root, relative);
 
   // Path traversal guard: the resolved path must stay inside the public dir.
-  if (!resolved.startsWith(path.resolve(root) + path.sep) && resolved !== path.resolve(root, 'index.html')) {
+  if (!resolved.startsWith(root + path.sep) && resolved !== path.resolve(root, 'index.html')) {
     response.writeHead(403).end('Forbidden');
     return;
   }
@@ -102,13 +116,43 @@ function serveStatic(response: http.ServerResponse, pathname: string): void {
     return;
   }
 
-  const body = fs.readFileSync(resolved);
+  // The prefix check above compares the path we were asked for, not the file
+  // it points at. A symlink inside the public directory satisfies it while
+  // resolving anywhere on disk, so the real path is checked too.
+  const real = fs.realpathSync(resolved);
+  if (!real.startsWith(fs.realpathSync(root) + path.sep)) {
+    response.writeHead(403).end('Forbidden');
+    return;
+  }
+
+  const body = fs.readFileSync(real);
   response.writeHead(200, {
-    'content-type': MIME[path.extname(resolved)] ?? 'application/octet-stream',
+    ...SECURITY_HEADERS,
+    'content-type': MIME[path.extname(real)] ?? 'application/octet-stream',
     'content-length': body.length,
     'cache-control': 'no-store',
   });
   response.end(body);
+}
+
+/**
+ * Rejects state-changing requests that came from another origin.
+ *
+ * The dashboard has no authentication because it listens on 127.0.0.1 and is
+ * yours alone. That is fine for reads, but any page you happen to have open
+ * can POST to localhost from your browser, and a POST here starts a research
+ * run or rewrites your settings. Same-origin requests send no Origin header or
+ * send ours; anything else is not the dashboard talking.
+ */
+export function isSameOrigin(request: Pick<http.IncomingMessage, 'headers'>): boolean {
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  try {
+    const host = request.headers.host ?? `${config.server.host}:${config.server.port}`;
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
 }
 
 export function createServer(): http.Server {
@@ -123,6 +167,12 @@ export function createServer(): http.Server {
         return;
       }
       serveStatic(response, url.pathname);
+      return;
+    }
+
+    if (request.method === 'POST' && !isSameOrigin(request)) {
+      log.warn(`rejected cross-origin POST to ${url.pathname} from ${request.headers.origin}`);
+      sendJson(response, 403, { error: 'Cross-origin requests are not accepted.' });
       return;
     }
 
@@ -151,6 +201,24 @@ export function createServer(): http.Server {
 
 if (require.main === module) {
   const server = createServer();
+
+  // A busy port is the single most likely startup failure — you left the
+  // dashboard running in another tab. Unhandled, net emits an 'error' event
+  // that Node turns into a twenty-line stack trace, which reads as a crash in
+  // the tool rather than as "it is already running over there".
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      process.stderr.write(
+        `Port ${config.server.port} is already in use.\n` +
+          `The dashboard may already be running at http://${config.server.host}:${config.server.port}\n` +
+          `Start it on another port with:  PORT=4312 npm run dashboard\n`,
+      );
+    } else {
+      process.stderr.write(`${error.message}\n`);
+    }
+    process.exit(1);
+  });
+
   server.listen(config.server.port, config.server.host, () => {
     process.stdout.write(
       `dev-radar dashboard  →  http://${config.server.host}:${config.server.port}\n`,

@@ -1,48 +1,77 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
+<!--
+  Content Security Policy.
+
+  This page renders text pulled from RSS feeds and written by a language model,
+  which is untrusted input by definition. The client never uses innerHTML, so
+  injection has no sink today; this is the second lock. There are no inline
+  scripts and no inline styles, so the policy can be strict without exceptions,
+  and `connect-src 'self'` means a script that did somehow run could not send
+  anything anywhere.
+
+  GitHub Pages cannot set response headers, so the policy is declared here.
+  The local server sends the same rules as a real header, plus the
+  frame-ancestors directive that meta tags are not allowed to carry.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>dev-radar</title>
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%234d7c0f'/></svg>">
 </head>
 <body>
 
 <div class="shell">
 
-  <nav class="rail" aria-label="Sections">
+  <nav class="rail" id="rail" aria-label="Sections">
     <div class="rail-mark">
       <span class="rail-mark-name">dev<span>radar</span></span>
       <span class="rail-mark-sub" id="provider-badge">checking model…</span>
     </div>
 
+    <!--
+      Language switch. Two buttons in a group rather than a <select>, so the
+      current language is visible without opening anything and both options are
+      one tab stop and one arrow key away. Each label is written in its own
+      language: someone who cannot read the current interface can still find
+      their way out of it.
+    -->
+    <div class="lang-switch" role="group" id="lang-switch">
+      <button type="button" class="lang-option" data-lang="en" lang="en">EN</button>
+      <button type="button" class="lang-option" data-lang="ar" lang="ar">العربية</button>
+    </div>
+
     <ul class="rail-nav">
-      <li><button class="rail-link is-active" data-view="radar" aria-current="page">Radar</button></li>
-      <li><button class="rail-link" data-view="topics">Topics</button></li>
-      <li><button class="rail-link" data-view="weekly">Weekly</button></li>
-      <li><button class="rail-link" data-view="history">History</button></li>
-      <li><button class="rail-link" data-view="sources">Sources</button></li>
-      <li><button class="rail-link" data-view="settings">Settings</button></li>
+      <li><button class="rail-link is-active" data-view="radar" data-i18n="nav.radar" aria-current="page">Radar</button></li>
+      <li><button class="rail-link" data-view="topics" data-i18n="nav.topics">Topics</button></li>
+      <li><button class="rail-link" data-view="weekly" data-i18n="nav.weekly">Weekly</button></li>
+      <li><button class="rail-link" data-view="history" data-i18n="nav.history">History</button></li>
+      <li><button class="rail-link" data-view="sources" data-i18n="nav.sources">Sources</button></li>
+      <li><button class="rail-link" data-view="settings" data-i18n="nav.settings">Settings</button></li>
     </ul>
 
     <div class="rail-foot">
-      <button class="btn btn-primary" id="run-radar">Run research</button>
-      <p class="rail-note" id="last-run">No runs yet</p>
+      <button class="btn btn-primary" id="run-radar" data-i18n="nav.runResearch">Run research</button>
+      <p class="rail-note" id="last-run" data-i18n="nav.noRuns">No runs yet</p>
     </div>
   </nav>
 
   <main class="main">
+    <p id="mode-banner" class="mode-banner" hidden></p>
     <div id="flash" class="flash" role="status" aria-live="polite" hidden></div>
 
     <!-- RADAR ---------------------------------------------------------- -->
     <section class="view is-active" data-view="radar">
       <header class="view-head">
-        <p class="eyebrow">Daily radar</p>
-        <h1 id="radar-date">Today</h1>
-        <p class="lede" id="radar-summary">Loading…</p>
+        <p class="eyebrow" data-i18n="radar.eyebrow">Daily radar</p>
+        <h1 id="radar-date" data-i18n="radar.heading">Today</h1>
+        <p class="lede" id="radar-summary" data-i18n="radar.loading">Loading…</p>
       </header>
+      <div id="radar-explain"></div>
       <div id="top-pick"></div>
       <ol class="topic-list" id="radar-list"></ol>
     </section>
@@ -50,20 +79,35 @@
     <!-- TOPICS --------------------------------------------------------- -->
     <section class="view" data-view="topics">
       <header class="view-head">
-        <p class="eyebrow">All topics</p>
-        <h1>Everything on the radar</h1>
+        <p class="eyebrow" data-i18n="topics.eyebrow">All topics</p>
+        <h1 data-i18n="topics.heading">Everything on the radar</h1>
         <div class="filters">
-          <label>Minimum score
+          <label>
+            <span data-i18n="topics.sort">Sort by</span>
+            <select id="filter-sort">
+              <option value="opportunity" data-i18n="sort.opportunity">Best to write</option>
+              <option value="fit" data-i18n="sort.fit">Best fit for me</option>
+              <option value="interest" data-i18n="sort.interest">Most people care</option>
+              <option value="newest" data-i18n="sort.newest">Newest first</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="topics.minScore">Min fit</span>
             <input type="number" id="filter-min" min="0" max="100" step="5" value="0">
           </label>
-          <label>Status
+          <label>
+            <span data-i18n="topics.minInterest">Min interest</span>
+            <input type="number" id="filter-interest" min="0" max="100" step="5" value="0">
+          </label>
+          <label>
+            <span data-i18n="topics.status">Status</span>
             <select id="filter-status">
-              <option value="any">Any</option>
-              <option value="shortlisted">Shortlisted</option>
-              <option value="new">New</option>
-              <option value="drafted">Drafted</option>
-              <option value="published">Published</option>
-              <option value="rejected">Rejected</option>
+              <option value="any" data-i18n="topics.statusAny">Any</option>
+              <option value="shortlisted">shortlisted</option>
+              <option value="new">new</option>
+              <option value="drafted">drafted</option>
+              <option value="published">published</option>
+              <option value="rejected">rejected</option>
             </select>
           </label>
         </div>
@@ -74,8 +118,8 @@
     <!-- WEEKLY --------------------------------------------------------- -->
     <section class="view" data-view="weekly">
       <header class="view-head">
-        <p class="eyebrow">Weekly developer radar</p>
-        <h1 id="weekly-range">Last 7 days</h1>
+        <p class="eyebrow" data-i18n="weekly.eyebrow">Weekly developer radar</p>
+        <h1 id="weekly-range" data-i18n="weekly.heading">Last 7 days</h1>
       </header>
       <div id="weekly-body"></div>
     </section>
@@ -83,8 +127,8 @@
     <!-- HISTORY -------------------------------------------------------- -->
     <section class="view" data-view="history">
       <header class="view-head">
-        <p class="eyebrow">History</p>
-        <h1>What you have run and written</h1>
+        <p class="eyebrow" data-i18n="history.eyebrow">History</p>
+        <h1 data-i18n="history.heading">What you have run and written</h1>
       </header>
       <div id="history-body"></div>
     </section>
@@ -92,10 +136,9 @@
     <!-- SOURCES -------------------------------------------------------- -->
     <section class="view" data-view="sources">
       <header class="view-head">
-        <p class="eyebrow">Sources</p>
-        <h1>Where topics come from</h1>
-        <p class="lede">Turning a source off stops it being fetched. Feed URLs live in
-          <code>config/sources.json</code>.</p>
+        <p class="eyebrow" data-i18n="sources.eyebrow">Sources</p>
+        <h1 data-i18n="sources.heading">Where topics come from</h1>
+        <p class="lede" data-i18n="sources.lede">Turning a source off stops it being fetched.</p>
       </header>
       <div id="sources-body"></div>
     </section>
@@ -103,8 +146,8 @@
     <!-- SETTINGS ------------------------------------------------------- -->
     <section class="view" data-view="settings">
       <header class="view-head">
-        <p class="eyebrow">Settings</p>
-        <h1>Thresholds and targets</h1>
+        <p class="eyebrow" data-i18n="settings.eyebrow">Settings</p>
+        <h1 data-i18n="settings.heading">Thresholds and targets</h1>
       </header>
       <div id="settings-body"></div>
     </section>
@@ -113,13 +156,23 @@
   <!-- DETAIL PANEL ----------------------------------------------------- -->
   <aside class="panel" id="panel" hidden tabindex="-1" role="region" aria-label="Topic detail">
     <div class="panel-head">
-      <button class="panel-close" id="panel-close" aria-label="Close topic">Close</button>
+      <button class="panel-close" id="panel-close" data-i18n="topic.close">Close</button>
     </div>
     <div class="panel-body" id="panel-body"></div>
   </aside>
 
 </div>
 
-<script src="/app.js"></script>
+<!--
+  Relative paths, not absolute: the same files are served from the root by the
+  local server and from /<repo-name>/ by GitHub Pages. A leading slash works in
+  one and 404s in the other.
+-->
+<script src="i18n/en.js"></script>
+<script src="i18n/ar.js"></script>
+<script src="i18n/index.js"></script>
+<script src="clipboard.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

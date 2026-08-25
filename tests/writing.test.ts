@@ -224,7 +224,7 @@ function makeScore(over: Partial<TopicScore> = {}): TopicScore {
     topicId: 1, freshness: 50, relevance: 50, practicalValue: 50,
     discussionPotential: 50, educationalValue: 50, originality: 50, audienceFit: 50,
     total: 50, confidence: 50, linkedinScore: 50, mediumScore: 50, controversy: 50,
-    reasons: [], ...over,
+    audience: null, reasons: [], ...over,
   };
 }
 

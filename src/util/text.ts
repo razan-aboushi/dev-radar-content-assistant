@@ -123,17 +123,34 @@ export function slugify(input: string): string {
   return base.slice(0, 80).replace(/^[-.]+|[-.]+$/g, '') || 'topic';
 }
 
+/**
+ * Cutting at `max` code units lands inside a surrogate pair whenever an emoji
+ * straddles the boundary, and half a pair renders as a replacement character.
+ * Feed summaries are cut at 1200 and hooks at 140, so this was reachable from
+ * any feed that uses emoji in prose.
+ */
+function endsInLoneSurrogate(input: string): boolean {
+  const last = input.charCodeAt(input.length - 1);
+  return last >= 0xd800 && last <= 0xdbff;
+}
+
 export function truncate(input: string, max: number): string {
   if (input.length <= max) return input;
-  const cut = input.slice(0, max);
+  let cut = input.slice(0, max);
+  if (endsInLoneSurrogate(cut)) cut = cut.slice(0, -1);
   const lastSpace = cut.lastIndexOf(' ');
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
+/**
+ * Terminators include the Arabic question mark (؟ U+061F) and full stop
+ * (۔ U+06D4). Without them an Arabic draft is one enormous "sentence", which
+ * makes every sentence-length and question-rate measurement meaningless.
+ */
 export function sentences(input: string): string[] {
   return input
     .replace(/\s+/g, ' ')
-    .split(/(?<=[.!?…])\s+/)
+    .split(/(?<=[.!?…؟۔])\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
 }

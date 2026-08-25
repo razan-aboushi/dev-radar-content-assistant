@@ -7,9 +7,14 @@
     "      'reputable' = established publication. Cite, but prefer the primary link.",
     "      'community' = discovery signal only. Never cited as a factual source.",
     "",
-    "These feed URLs have NOT been verified from inside this project's build",
-    "environment (no outbound network). Run `npm run sources -- --check` on your",
-    "machine to see which respond, and disable or fix any that fail."
+    "weight: 0.5-1.5. How well this outlet matches YOUR subjects. Multiplies relevance.",
+    "reach:  1-5.     How large this outlet's developer audience is. Feeds the",
+    "                 audience-interest score. A niche newsletter can be highly",
+    "                 relevant to you (high weight) and still small (low reach).",
+    "",
+    "Every URL below was probed with `npm run sources -- --check` and returned",
+    "usable items. Feeds still rot: re-run that command when something looks",
+    "quiet, and disable whatever fails."
   ],
   "sources": [
     {
@@ -20,7 +25,8 @@
       "tier": "primary",
       "category": "nodejs",
       "enabled": true,
-      "weight": 1.4
+      "weight": 1.4,
+      "reach": 5
     },
     {
       "key": "nodejs-releases",
@@ -30,7 +36,8 @@
       "tier": "primary",
       "category": "nodejs",
       "enabled": true,
-      "weight": 1.4
+      "weight": 1.4,
+      "reach": 5
     },
     {
       "key": "v8-blog",
@@ -40,7 +47,8 @@
       "tier": "primary",
       "category": "javascript",
       "enabled": true,
-      "weight": 1.4
+      "weight": 1.4,
+      "reach": 4
     },
     {
       "key": "tc39-proposals",
@@ -50,7 +58,8 @@
       "tier": "primary",
       "category": "javascript",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 3
     },
     {
       "key": "mdn-blog",
@@ -60,7 +69,8 @@
       "tier": "primary",
       "category": "web-platform",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 5
     },
     {
       "key": "react-blog",
@@ -70,7 +80,8 @@
       "tier": "primary",
       "category": "react",
       "enabled": true,
-      "weight": 1.4
+      "weight": 1.4,
+      "reach": 5
     },
     {
       "key": "react-releases",
@@ -80,7 +91,8 @@
       "tier": "primary",
       "category": "react",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 5
     },
     {
       "key": "nextjs-blog",
@@ -90,7 +102,8 @@
       "tier": "primary",
       "category": "nextjs",
       "enabled": true,
-      "weight": 1.4
+      "weight": 1.4,
+      "reach": 5
     },
     {
       "key": "nextjs-releases",
@@ -100,7 +113,8 @@
       "tier": "primary",
       "category": "nextjs",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 4
     },
     {
       "key": "typescript-blog",
@@ -110,7 +124,8 @@
       "tier": "primary",
       "category": "typescript",
       "enabled": true,
-      "weight": 1.4
+      "weight": 1.4,
+      "reach": 5
     },
     {
       "key": "typescript-releases",
@@ -120,7 +135,8 @@
       "tier": "primary",
       "category": "typescript",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 4
     },
     {
       "key": "chrome-developers",
@@ -130,7 +146,8 @@
       "tier": "primary",
       "category": "web-platform",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 5
     },
     {
       "key": "webdev",
@@ -140,7 +157,8 @@
       "tier": "primary",
       "category": "performance",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 5
     },
     {
       "key": "google-search-central",
@@ -150,7 +168,8 @@
       "tier": "primary",
       "category": "seo",
       "enabled": true,
-      "weight": 1.3
+      "weight": 1.3,
+      "reach": 4
     },
     {
       "key": "deno-blog",
@@ -160,7 +179,8 @@
       "tier": "primary",
       "category": "javascript",
       "enabled": true,
-      "weight": 1.1
+      "weight": 1.1,
+      "reach": 3
     },
     {
       "key": "bun-releases",
@@ -170,7 +190,8 @@
       "tier": "primary",
       "category": "javascript",
       "enabled": true,
-      "weight": 1.1
+      "weight": 1.1,
+      "reach": 4
     },
     {
       "key": "vite-releases",
@@ -180,7 +201,8 @@
       "tier": "primary",
       "category": "devtools",
       "enabled": true,
-      "weight": 1.1
+      "weight": 1.1,
+      "reach": 4
     },
     {
       "key": "vercel-blog",
@@ -190,7 +212,8 @@
       "tier": "primary",
       "category": "frontend",
       "enabled": true,
-      "weight": 1.1
+      "weight": 1.1,
+      "reach": 4
     },
     {
       "key": "github-blog",
@@ -200,7 +223,8 @@
       "tier": "reputable",
       "category": "devtools",
       "enabled": true,
-      "weight": 1.0
+      "weight": 1.0,
+      "reach": 5
     },
     {
       "key": "github-security",
@@ -210,7 +234,8 @@
       "tier": "reputable",
       "category": "security",
       "enabled": true,
-      "weight": 1.1
+      "weight": 1.1,
+      "reach": 4
     },
     {
       "key": "javascript-weekly",
@@ -220,7 +245,8 @@
       "tier": "reputable",
       "category": "javascript",
       "enabled": true,
-      "weight": 1.0
+      "weight": 1.0,
+      "reach": 4
     },
     {
       "key": "node-weekly",
@@ -230,7 +256,8 @@
       "tier": "reputable",
       "category": "nodejs",
       "enabled": true,
-      "weight": 1.0
+      "weight": 1.0,
+      "reach": 3
     },
     {
       "key": "smashing-magazine",
@@ -240,7 +267,8 @@
       "tier": "reputable",
       "category": "frontend",
       "enabled": true,
-      "weight": 0.95
+      "weight": 0.95,
+      "reach": 4
     },
     {
       "key": "css-tricks",
@@ -250,8 +278,203 @@
       "tier": "reputable",
       "category": "css-html",
       "enabled": true,
-      "weight": 0.9
+      "weight": 0.9,
+      "reach": 4
     },
+
+    {
+      "key": "openai-news",
+      "name": "OpenAI News",
+      "url": "https://openai.com/news/rss.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "ai-for-developers",
+      "enabled": true,
+      "weight": 1.2,
+      "reach": 5
+    },
+    {
+      "key": "huggingface-blog",
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "ai-for-developers",
+      "enabled": true,
+      "weight": 1.2,
+      "reach": 4
+    },
+    {
+      "key": "simonwillison",
+      "name": "Simon Willison (AI for developers)",
+      "url": "https://simonwillison.net/atom/everything/",
+      "kind": "atom",
+      "tier": "reputable",
+      "category": "ai-for-developers",
+      "enabled": true,
+      "weight": 1.2,
+      "reach": 4
+    },
+    {
+      "key": "stackoverflow-blog",
+      "name": "Stack Overflow Blog",
+      "url": "https://stackoverflow.blog/feed/",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "ai-for-developers",
+      "enabled": true,
+      "weight": 1.0,
+      "reach": 5
+    },
+    {
+      "key": "hn-ai",
+      "name": "Hacker News: AI for developers",
+      "url": "https://hn.algolia.com",
+      "kind": "hackernews",
+      "tier": "community",
+      "category": "ai-for-developers",
+      "enabled": true,
+      "weight": 0.9,
+      "reach": 5,
+      "query": "llm coding agent copilot prompt"
+    },
+
+    {
+      "key": "cloudflare-blog",
+      "name": "Cloudflare Blog",
+      "url": "https://blog.cloudflare.com/rss/",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "backend",
+      "enabled": true,
+      "weight": 1.1,
+      "reach": 5
+    },
+    {
+      "key": "go-blog",
+      "name": "The Go Blog",
+      "url": "https://go.dev/blog/feed.atom",
+      "kind": "atom",
+      "tier": "primary",
+      "category": "backend",
+      "enabled": true,
+      "weight": 0.95,
+      "reach": 4
+    },
+    {
+      "key": "rust-blog",
+      "name": "Rust Blog",
+      "url": "https://blog.rust-lang.org/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "backend",
+      "enabled": true,
+      "weight": 0.9,
+      "reach": 4
+    },
+    {
+      "key": "kubernetes-blog",
+      "name": "Kubernetes Blog",
+      "url": "https://kubernetes.io/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "backend",
+      "enabled": true,
+      "weight": 0.9,
+      "reach": 4
+    },
+    {
+      "key": "netflix-tech",
+      "name": "Netflix Technology Blog",
+      "url": "https://netflixtechblog.com/feed",
+      "kind": "rss",
+      "tier": "reputable",
+      "category": "architecture",
+      "enabled": true,
+      "weight": 1.0,
+      "reach": 4
+    },
+    {
+      "key": "hn-backend",
+      "name": "Hacker News: backend and architecture",
+      "url": "https://hn.algolia.com",
+      "kind": "hackernews",
+      "tier": "community",
+      "category": "backend",
+      "enabled": true,
+      "weight": 0.9,
+      "reach": 5,
+      "query": "backend database postgres scaling architecture api"
+    },
+
+    {
+      "key": "postgres-news",
+      "name": "PostgreSQL News",
+      "url": "https://www.postgresql.org/news.rss",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "databases",
+      "enabled": true,
+      "weight": 0.95,
+      "reach": 4
+    },
+
+    {
+      "key": "tailwind-blog",
+      "name": "Tailwind CSS Blog",
+      "url": "https://tailwindcss.com/feeds/feed.xml",
+      "kind": "rss",
+      "tier": "primary",
+      "category": "css-html",
+      "enabled": true,
+      "weight": 1.1,
+      "reach": 4
+    },
+    {
+      "key": "astro-releases",
+      "name": "Astro Releases",
+      "url": "withastro/astro",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "frontend",
+      "enabled": true,
+      "weight": 1.0,
+      "reach": 3
+    },
+    {
+      "key": "svelte-releases",
+      "name": "Svelte Releases",
+      "url": "sveltejs/svelte",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "frontend",
+      "enabled": true,
+      "weight": 1.0,
+      "reach": 3
+    },
+    {
+      "key": "vue-releases",
+      "name": "Vue Releases",
+      "url": "vuejs/core",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "frontend",
+      "enabled": true,
+      "weight": 1.0,
+      "reach": 4
+    },
+    {
+      "key": "playwright-releases",
+      "name": "Playwright Releases",
+      "url": "microsoft/playwright",
+      "kind": "github-releases",
+      "tier": "primary",
+      "category": "testing",
+      "enabled": true,
+      "weight": 1.0,
+      "reach": 3
+    },
+
     {
       "key": "gh-trending-ts",
       "name": "GitHub: rising TypeScript projects",
@@ -261,6 +484,7 @@
       "category": "open-source",
       "enabled": true,
       "weight": 0.85,
+      "reach": 3,
       "query": "language:TypeScript stars:>1000 pushed:>2026-01-01"
     },
     {
@@ -272,7 +496,8 @@
       "category": "frontend",
       "enabled": true,
       "weight": 0.85,
-      "query": "react OR nextjs OR frontend OR javascript"
+      "reach": 5,
+      "query": "react nextjs frontend javascript"
     },
     {
       "key": "hn-performance",
@@ -283,7 +508,8 @@
       "category": "performance",
       "enabled": true,
       "weight": 0.85,
-      "query": "web performance OR core web vitals OR software architecture"
+      "reach": 5,
+      "query": "web performance core web vitals software architecture"
     }
   ]
 }

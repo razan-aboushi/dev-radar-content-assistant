@@ -1,4 +1,5 @@
 import { sha1, truncate } from '../util/text';
+import { languagePack, type ContentLanguage } from './languages';
 import type { AngleKind, StyleProfile, Topic } from '../types';
 
 /**
@@ -9,10 +10,15 @@ import type { AngleKind, StyleProfile, Topic } from '../types';
  *
  * Patterns are also filtered by angle, because an opinion piece and a tutorial
  * do not open the same way.
+ *
+ * Arabic drafts draw from the Arabic pattern list, held in the same order as
+ * the English one so the per-angle indices below stay meaningful. An English
+ * hook pasted into the top of an Arabic post is the single most obvious way for
+ * a translated-feeling draft to give itself away.
  */
 
 const ANGLE_PATTERN_INDEX: Record<AngleKind, number[]> = {
-  // Indices into profile.hookPatterns.
+  // Indices into the pattern list for the target language.
   educational: [0, 5, 9, 4],
   opinion: [1, 2, 0, 6],
   'engineering-lesson': [3, 4, 7, 8, 6],
@@ -26,13 +32,14 @@ export interface HookContext {
   quality: string;
 }
 
-export function buildHookContext(subject: string): HookContext {
+export function buildHookContext(subject: string, language: ContentLanguage = 'en'): HookContext {
+  const { hookFills } = languagePack(language);
   return {
     subject,
-    commonAction: 'reach for the default',
-    complication: 'the default stops being the right answer once the app is real',
-    belief: `${subject} was mostly a detail`,
-    quality: 'being correct',
+    commonAction: hookFills.commonAction,
+    complication: hookFills.complication(subject),
+    belief: hookFills.belief(subject),
+    quality: hookFills.quality,
   };
 }
 
@@ -56,13 +63,34 @@ function slugIndex(slug: string, modulo: number): number {
   return Number.parseInt(hash, 16) % modulo;
 }
 
-export function selectHookPattern(profile: StyleProfile, angle: AngleKind, slug: string): string {
+/**
+ * English patterns are the author's own, from style/style-profile.json.
+ * Arabic ones ship with the language pack unless the profile overrides them,
+ * so the voice stays editable in one place per language.
+ */
+function patternsFor(profile: StyleProfile, language: ContentLanguage): string[] {
+  if (language === 'en') return profile.hookPatterns;
+  const override = profile.arabic?.hookPatterns;
+  return override && override.length > 0 ? override : [...languagePack(language).hookPatterns];
+}
+
+export function selectHookPattern(
+  profile: StyleProfile,
+  angle: AngleKind,
+  slug: string,
+  language: ContentLanguage = 'en',
+): string {
+  const patterns = patternsFor(profile, language);
   const allowed = (ANGLE_PATTERN_INDEX[angle] ?? [])
-    .map((index) => profile.hookPatterns[index])
+    .map((index) => patterns[index])
     .filter((pattern): pattern is string => typeof pattern === 'string');
 
-  const pool = allowed.length > 0 ? allowed : profile.hookPatterns;
-  if (pool.length === 0) return '{subject} — here is what actually changed.';
+  const pool = allowed.length > 0 ? allowed : patterns;
+  if (pool.length === 0) {
+    return language === 'ar'
+      ? '{subject} — إليك ما تغيّر فعلاً.'
+      : '{subject} — here is what actually changed.';
+  }
   return pool[slugIndex(slug, pool.length)] ?? pool[0]!;
 }
 
@@ -71,9 +99,10 @@ export function buildHook(
   angle: AngleKind,
   topic: Pick<Topic, 'title' | 'slug' | 'category'>,
   subject: string,
+  language: ContentLanguage = 'en',
 ): string {
-  const pattern = selectHookPattern(profile, angle, topic.slug);
-  return truncate(fillPattern(pattern, buildHookContext(subject)), 140);
+  const pattern = selectHookPattern(profile, angle, topic.slug, language);
+  return truncate(fillPattern(pattern, buildHookContext(subject, language)), 140);
 }
 
 /** Alternative hooks offered alongside the chosen one, so you can swap. */
@@ -82,11 +111,12 @@ export function alternativeHooks(
   angle: AngleKind,
   topic: Pick<Topic, 'title' | 'slug' | 'category'>,
   subject: string,
+  language: ContentLanguage = 'en',
   count = 3,
 ): string[] {
-  const context = buildHookContext(subject);
-  const chosen = selectHookPattern(profile, angle, topic.slug);
-  return profile.hookPatterns
+  const context = buildHookContext(subject, language);
+  const chosen = selectHookPattern(profile, angle, topic.slug, language);
+  return patternsFor(profile, language)
     .filter((pattern) => pattern !== chosen)
     .map((pattern) => truncate(fillPattern(pattern, context), 140))
     .slice(0, count);

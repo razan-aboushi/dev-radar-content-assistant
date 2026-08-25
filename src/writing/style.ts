@@ -3,6 +3,7 @@ import path from 'node:path';
 import { config, loadStyleProfile, saveStyleProfile } from '../config';
 import { createLogger } from '../logger';
 import { countEmoji, paragraphs, sentences, wordCount } from '../util/text';
+import { languagePack, type ContentLanguage } from './languages';
 import type { MeasuredStyle, StyleProfile } from '../types';
 
 const log = createLogger('style');
@@ -107,12 +108,46 @@ export function learnStyle(): { profile: StyleProfile; docCount: number } {
 }
 
 /**
+ * The signature phrases and banned list for one language. The Arabic side comes
+ * from the profile when the author has written her own, and from the language
+ * pack otherwise, so a profile file with no `arabic` block still works.
+ */
+export function voiceFor(
+  profile: StyleProfile,
+  language: ContentLanguage,
+): { greeting: string; signaturePhrases: string[]; bannedPhrases: string[] } {
+  const pack = languagePack(language);
+  if (language === 'en') {
+    return {
+      greeting: profile.greetings[0] ?? pack.greeting,
+      signaturePhrases: profile.signaturePhrases,
+      bannedPhrases: profile.bannedPhrases,
+    };
+  }
+  const arabic = profile.arabic ?? {};
+  return {
+    greeting: arabic.greetings?.[0] ?? pack.greeting,
+    signaturePhrases: arabic.signaturePhrases ?? [],
+    // The English banned list still applies: a model writing Arabic reaches for
+    // "game-changing" in English just as readily inside a mixed sentence.
+    bannedPhrases: [...(arabic.bannedPhrases ?? []), ...pack.style.bannedPhrases, ...profile.bannedPhrases],
+  };
+}
+
+/**
  * The system prompt. Everything the model needs to write as Razan and nothing
  * about the specific topic, so it can be cached and reused across generations.
  */
-export function buildSystemPrompt(profile: StyleProfile): string {
+export function buildSystemPrompt(
+  profile: StyleProfile,
+  language: ContentLanguage = 'en',
+): string {
+  const pack = languagePack(language);
+  const voice = voiceFor(profile, language);
+
   const lines: string[] = [
     `You are ghost-writing as ${profile.name}, a frontend-focused software engineer who writes for other developers.`,
+    `Write in ${pack.englishName}.`,
     '',
     'VOICE',
     '- Simple, clear, human, conversational. Talk directly to another developer.',
@@ -124,10 +159,22 @@ export function buildSystemPrompt(profile: StyleProfile): string {
     '- Corporate or academic register. No filler transitions.',
     '- Fake motivation, hype, clickbait, or exaggerated claims.',
     '- Any of these phrases or anything close to them:',
-    ...profile.bannedPhrases.slice(0, 40).map((phrase) => `  · ${phrase}`),
-    '',
-    'PHRASES THAT SOUND LIKE HER (use sparingly, do not force all of them in)',
-    ...profile.signaturePhrases.map((phrase) => `  · ${phrase}`),
+    ...voice.bannedPhrases.slice(0, 40).map((phrase) => `  · ${phrase}`),
+  ];
+
+  if (voice.signaturePhrases.length > 0) {
+    lines.push(
+      '',
+      'PHRASES THAT SOUND LIKE HER (use sparingly, do not force all of them in)',
+      ...voice.signaturePhrases.map((phrase) => `  · ${phrase}`),
+    );
+  }
+
+  if (pack.voiceRules.length > 0) {
+    lines.push('', `WRITING IN ${pack.englishName.toUpperCase()}`, ...pack.voiceRules.map((rule) => `- ${rule}`));
+  }
+
+  lines.push(
     '',
     'FACTS',
     '- You will be given a list of verified claims. Use only those.',
@@ -135,7 +182,7 @@ export function buildSystemPrompt(profile: StyleProfile): string {
     '- If a claim is labelled single-source, hedge it ("reported by one source").',
     '- If a claim is labelled unverified, leave it out entirely.',
     '- If a feature is a proposal or experimental, say so plainly.',
-  ];
+  );
 
   const measured = profile.measured;
   if (measured) {

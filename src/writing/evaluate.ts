@@ -1,4 +1,9 @@
 import { clamp, countEmoji, paragraphs, sentences, wordCount } from '../util/text';
+import {
+  QUESTION_MARK_AT_END,
+  languagePack,
+  type ContentLanguage,
+} from './languages';
 import type { StyleProfile, StyleScore } from '../types';
 
 /**
@@ -12,38 +17,32 @@ import type { StyleProfile, StyleScore } from '../types';
  * (banned phrases, uniform sentence length, triadic lists, no first person);
  * they cannot judge whether an idea is interesting. Treat the number as a smoke
  * alarm, not a verdict.
+ *
+ * Every pattern lives in languages.ts, one set per language, because the
+ * English set reads zero against Arabic and would fail every Arabic draft on
+ * dimensions it never measured.
  */
-
-/** Structural giveaways, independent of the banned-phrase list. */
-const AI_PATTERNS: Array<{ re: RegExp; label: string }> = [
-  { re: /\bnot only\b[^.]{0,80}\bbut also\b/i, label: '"not only … but also" construction' },
-  { re: /\bit'?s (?:not|no longer) (?:just|merely) about\b/i, label: '"it\'s not just about X" construction' },
-  { re: /\bwhether you'?re a\b[^.]{0,60}\bor a\b/i, label: '"whether you\'re a X or a Y" audience sweep' },
-  { re: /^\s*(?:in conclusion|to sum up|to summarize|in summary)\b/im, label: 'essay-style summary marker' },
-  { re: /\bthe key (?:takeaway|is to)\b/i, label: '"the key takeaway" wrap-up' },
-  { re: /\bby (?:understanding|leveraging|embracing)\b[^.]{0,60}\byou can\b/i, label: '"by X-ing you can Y" payoff sentence' },
-  { re: /\b(?:crucial|essential|vital|pivotal|paramount)\b/i, label: 'inflated importance adjective' },
-  { re: /\bplays a (?:crucial|key|vital|significant) role\b/i, label: '"plays a crucial role"' },
-  { re: /\bin the world of\b|\bin the realm of\b/i, label: '"in the world/realm of" opener' },
-  { re: /—[^—]{10,}—/, label: 'em-dash aside (common LLM rhythm; fine occasionally, suspicious if repeated)' },
-  { re: /\bremember(?:,| that)\b[^.]{0,60}\bis (?:a )?journey\b/i, label: '"it\'s a journey" platitude' },
-  { re: /\bhappy coding\b/i, label: '"happy coding" sign-off' },
-];
 
 export interface AiTellReport {
   tells: string[];
   bannedHits: string[];
 }
 
-export function detectAiTells(text: string, profile: StyleProfile): AiTellReport {
+export function detectAiTells(
+  text: string,
+  profile: StyleProfile,
+  language: ContentLanguage = 'en',
+): AiTellReport {
+  const rules = languagePack(language).style;
   const lower = text.toLowerCase();
   const tells: string[] = [];
 
-  for (const pattern of AI_PATTERNS) {
+  for (const pattern of rules.aiPatterns) {
     if (pattern.re.test(text)) tells.push(pattern.label);
   }
 
-  const bannedHits = profile.bannedPhrases.filter((phrase) => lower.includes(phrase.toLowerCase()));
+  const banned = [...profile.bannedPhrases, ...rules.bannedPhrases];
+  const bannedHits = banned.filter((phrase) => lower.includes(phrase.toLowerCase()));
 
   // Uniform sentence length is one of the strongest structural tells.
   const lengths = sentences(text).map(wordCount).filter((n) => n > 2);
@@ -59,7 +58,7 @@ export function detectAiTells(text: string, profile: StyleProfile): AiTellReport
   const triads = text.match(/\b\w+,\s+\w+,?\s+and\s+\w+\b/g) ?? [];
   if (triads.length >= 3) tells.push(`${triads.length} rule-of-three lists — cut some`);
 
-  return { tells, bannedHits };
+  return { tells, bannedHits: [...new Set(bannedHits)] };
 }
 
 export interface StyleScoreInput {
@@ -69,6 +68,8 @@ export interface StyleScoreInput {
   /** Target word range, from settings. Falls back to the shipped defaults. */
   minWords?: number;
   maxWords?: number;
+  /** Which language the draft is written in. Selects the pattern set. */
+  language?: ContentLanguage;
   /** Whether the draft carries a real first-hand observation. */
   hasPersonalTake: boolean;
   /** Whether it ends on a question that invites replies. */
@@ -79,6 +80,8 @@ export interface StyleScoreInput {
 
 export function scoreStyle(input: StyleScoreInput): StyleScore {
   const { text, profile, kind } = input;
+  const language = input.language ?? 'en';
+  const rules = languagePack(language).style;
   const notes: string[] = [];
 
   const sents = sentences(text);
@@ -95,22 +98,24 @@ export function scoreStyle(input: StyleScoreInput): StyleScore {
   const simplicity = clamp(100 - Math.abs(drift) * (drift > 0 ? 6 : 3.5));
   if (avgSentence > target + 5) notes.push(`Sentences average ${Math.round(avgSentence)} words; aim for about ${target}.`);
 
-  // conversational: contractions, second person, short paragraphs.
-  const contractions = (text.match(/\b\w+'(?:s|re|t|ve|ll|d|m)\b/gi) ?? []).length;
-  const secondPerson = (text.match(/\byou(?:r|'re)?\b/gi) ?? []).length;
+  // conversational: informal markers, second person, short paragraphs.
+  const informal = (text.match(rules.informal) ?? []).length;
+  const secondPerson = (text.match(rules.secondPerson) ?? []).length;
   const conversational = clamp(
-    30 + Math.min(contractions, 8) * 5 + Math.min(secondPerson, 8) * 4 - Math.max(0, avgParaSentences - 3) * 8,
+    30 + Math.min(informal, 8) * 5 + Math.min(secondPerson, 8) * 4 - Math.max(0, avgParaSentences - 3) * 8,
   );
   if (avgParaSentences > 3.5) notes.push('Paragraphs are long. Break them up.');
 
   // technicalClarity: concrete nouns, code or version references, no vagueness.
+  // Deliberately language-neutral: an Arabic draft still writes `useEffect()`
+  // and `v22.5.0` in Latin script, which is exactly the signal being counted.
   const concrete = (text.match(/`[^`]+`|\bv?\d+\.\d+|\b[A-Za-z]+\(\)|\b[a-z]+[A-Z][a-zA-Z]*\b/g) ?? []).length;
-  const vague = (text.match(/\b(?:things|stuff|various|several|many aspects|a lot of)\b/gi) ?? []).length;
+  const vague = (text.match(rules.vague) ?? []).length;
   const technicalClarity = clamp(35 + Math.min(concrete, 12) * 5 - vague * 8 + (input.hasConcreteDetail ? 15 : 0));
   if (!input.hasConcreteDetail) notes.push('No concrete, checkable detail. Add a specific version, API, number or symptom.');
 
   // personality: first person plus at least one signature-ish move.
-  const firstPerson = (text.match(/\b(?:I|I'm|I've|my|me)\b/g) ?? []).length;
+  const firstPerson = (text.match(rules.firstPerson) ?? []).length;
   const signatureHits = profile.signaturePhrases.filter((p) =>
     text.toLowerCase().includes(p.toLowerCase().slice(0, 18)),
   ).length;
@@ -120,11 +125,11 @@ export function scoreStyle(input: StyleScoreInput): StyleScore {
   if (firstPerson === 0) notes.push('No first-person voice anywhere. Add the part only you could have written.');
 
   // usefulness: does the reader leave with something they can do.
-  const actionable = (text.match(/\b(?:check|use|avoid|replace|move|measure|test|profile|set|add|remove|verify)\b/gi) ?? []).length;
+  const actionable = (text.match(rules.actionable) ?? []).length;
   const usefulness = clamp(30 + Math.min(actionable, 10) * 6 + (input.hasConcreteDetail ? 12 : 0));
 
   // originality: penalise generic openers and banned phrasing.
-  const { tells, bannedHits } = detectAiTells(text, profile);
+  const { tells, bannedHits } = detectAiTells(text, profile, language);
   const originality = clamp(90 - bannedHits.length * 25 - tells.length * 9);
   for (const hit of bannedHits) notes.push(`Banned phrase present: "${hit}".`);
   for (const tell of tells.slice(0, 4)) notes.push(`AI tell: ${tell}.`);
@@ -134,9 +139,9 @@ export function scoreStyle(input: StyleScoreInput): StyleScore {
   const hookWords = wordCount(firstLine);
   let hookStrength = 45;
   if (hookWords > 0 && hookWords <= 16) hookStrength += 20;
-  if (/[?.]$|\.\.\.$/.test(firstLine)) hookStrength += 8;
-  if (/\b(?:I|you|your|nobody|most|many)\b/i.test(firstLine)) hookStrength += 12;
-  if (/^(?:in|as|the world|today)/i.test(firstLine)) hookStrength -= 25;
+  if (/[?؟.]$|\.\.\.$/.test(firstLine)) hookStrength += 8;
+  if (rules.hookPronouns.test(firstLine)) hookStrength += 12;
+  if (rules.weakOpener.test(firstLine)) hookStrength -= 25;
   if (hookWords > 25) hookStrength -= 20;
   hookStrength = clamp(hookStrength);
   if (hookStrength < 60) notes.push('Weak first line. Lead with the surprising part.');
@@ -150,8 +155,8 @@ export function scoreStyle(input: StyleScoreInput): StyleScore {
   if (emoji > emojiTarget + 3) notes.push('Too many emoji.');
 
   // discussionPotential: a real question, an opinion, a stake.
-  const questions = sents.filter((s) => s.trim().endsWith('?')).length;
-  const opinionated = /\b(?:I think|I'd|I would|honestly|in my experience|I disagree|my take)\b/i.test(text);
+  const questions = sents.filter((s) => QUESTION_MARK_AT_END.test(s.trim())).length;
+  const opinionated = rules.opinionated.test(text);
   const discussionPotential = clamp(
     30 + questions * 14 + (opinionated ? 20 : 0) + (input.hasQuestion ? 15 : 0),
   );

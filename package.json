@@ -26,7 +26,10 @@
     "generate:medium": "tsx src/cli/index.ts generate:medium",
     "dashboard": "tsx src/server/server.ts",
     "demo": "tsx scripts/demo-seed.ts",
-    "dev": "tsx src/server/server.ts"
+    "dev": "tsx src/server/server.ts",
+    "site": "tsx scripts/build-site.ts",
+    "pregenerate": "tsx scripts/pregenerate.ts",
+    "site:preview": "npm run site && node scripts/serve-site.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",

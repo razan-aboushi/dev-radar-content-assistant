@@ -40,6 +40,7 @@ export function getDb(): DB {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(fs.readFileSync(schemaPath(), 'utf8'));
+  migrate(db);
   seedSettings(db);
   syncSources(db);
   instance = db;
@@ -55,8 +56,36 @@ export function createTestDb(): DB {
       .readFileSync(schemaPath(), 'utf8')
       .replace(/PRAGMA journal_mode = WAL;/, ''),
   );
+  migrate(db);
   seedSettings(db);
   return db;
+}
+
+/**
+ * Additive migrations for databases created before a column existed.
+ *
+ * schema.sql is all `CREATE TABLE IF NOT EXISTS`, so a table added to it is
+ * picked up on the next run but a *column* added to an existing table is not —
+ * the CREATE is skipped wholesale and every later query fails with "no such
+ * column" against a database that was working a moment ago.
+ *
+ * Each entry is idempotent: the column is added only when PRAGMA table_info
+ * says it is missing, so this is safe to run on every open.
+ */
+const COLUMN_MIGRATIONS: ReadonlyArray<{ table: string; column: string; definition: string }> = [
+  { table: 'content', column: 'language', definition: "TEXT NOT NULL DEFAULT 'en'" },
+  { table: 'topic_scores', column: 'audience', definition: 'TEXT' },
+  { table: 'sources', column: 'reach', definition: 'INTEGER NOT NULL DEFAULT 3' },
+];
+
+export function migrate(db: DB): void {
+  for (const { table, column, definition } of COLUMN_MIGRATIONS) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (columns.length === 0) continue;
+    if (columns.some((existing) => existing.name === column)) continue;
+    log.info(`migrating: adding ${table}.${column}`);
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 function seedSettings(db: DB): void {
@@ -82,12 +111,12 @@ export function syncSources(db: DB): void {
   }
 
   const upsert = db.prepare(`
-    INSERT INTO sources (key, name, url, kind, tier, category, enabled, weight, query)
-    VALUES (@key, @name, @url, @kind, @tier, @category, @enabled, @weight, @query)
+    INSERT INTO sources (key, name, url, kind, tier, category, enabled, weight, reach, query)
+    VALUES (@key, @name, @url, @kind, @tier, @category, @enabled, @weight, @reach, @query)
     ON CONFLICT(key) DO UPDATE SET
       name = excluded.name, url = excluded.url, kind = excluded.kind,
       tier = excluded.tier, category = excluded.category,
-      enabled = excluded.enabled, weight = excluded.weight, query = excluded.query
+      weight = excluded.weight, reach = excluded.reach, query = excluded.query
   `);
 
   const tx = db.transaction(() => {
@@ -101,6 +130,7 @@ export function syncSources(db: DB): void {
         category: source.category,
         enabled: source.enabled ? 1 : 0,
         weight: source.weight,
+        reach: source.reach ?? 3,
         query: source.query ?? null,
       });
     }

@@ -21,7 +21,8 @@ import { getAdapter } from '../sources/adapters';
 import { slugify } from '../util/text';
 import { clusterItems, checkRepeat } from './dedupe';
 import { generateAngles } from './angles';
-import { scoreTopic } from './score';
+import { scoreAudienceInterest } from './interest';
+import { opportunityScore, scoreTopic } from './score';
 import { detectCategory } from './signals';
 import { extractFacts } from './verify';
 import type { NormalizedItem, SourceTier, StoredItem, Topic } from '../types';
@@ -227,6 +228,18 @@ function scoreAndAnnotate(
     priorSimilarity,
     engagement,
   });
+
+  // How many people care, as opposed to how well it fits. Computed from the
+  // cluster's real payloads so the engagement numbers are the ones the sources
+  // actually reported.
+  score.audience = scoreAudienceInterest({
+    category: topic.category,
+    publishedAt: topic.publishedAt,
+    sourceTier: topic.sourceTier,
+    members,
+    reachOf: (key) => sourcesByKey.get(key)?.reach ?? 3,
+  });
+
   upsertScore(db, score);
 
   const lead = members.find((m) => m.id === topic.itemId) ?? members[0];
@@ -248,10 +261,14 @@ function scoreAndAnnotate(
   // Shortlisting moves in both directions so that lowering or raising
   // minTopicScore and re-running actually changes the shortlist. Statuses you
   // set yourself — rejected, drafted, published — are never overwritten.
+  //
+  // Measured against opportunity, matching the daily radar: the shortlist and
+  // the radar disagreeing about what qualifies would be its own bug.
   const minScore = getNumberSetting(db, 'minTopicScore');
-  if (topic.status === 'new' && score.total >= minScore) {
+  const qualifies = opportunityScore(score);
+  if (topic.status === 'new' && qualifies >= minScore) {
     updateTopicStatus(db, topic.id, 'shortlisted');
-  } else if (topic.status === 'shortlisted' && score.total < minScore) {
+  } else if (topic.status === 'shortlisted' && qualifies < minScore) {
     updateTopicStatus(db, topic.id, 'new');
   }
 }

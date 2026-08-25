@@ -1,0 +1,131 @@
+#
+# Publishes dev-radar to GitHub Pages, refreshed on a schedule.
+#
+# What this does, once a day:
+#   1. restores the database from the previous run (so history accumulates)
+#   2. fetches every enabled source and re-scores the radar
+#   3. pre-writes LinkedIn posts and Medium articles for the top topics,
+#      in English and Arabic, if a free AI key is configured
+#   4. freezes it all into static JSON and deploys it to Pages
+#
+# Cost: nothing. Actions minutes are unlimited on public repositories and
+# Pages is free for them. No server, no database host, no cold start.
+#
+# The AI key is optional. Without it the radar still publishes; only the
+# pre-written drafts are skipped. Add one as a repository secret named
+# AI_API_KEY (Settings -> Secrets and variables -> Actions) from any of the
+# free providers listed in the README.
+#
+name: Refresh radar and publish
+
+on:
+  schedule:
+    # 05:15 UTC daily. Off the hour on purpose: scheduled jobs at :00 queue
+    # behind everyone else's and can be delayed by many minutes.
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+    inputs:
+      pregenerate_count:
+        description: 'How many top topics to pre-write drafts for'
+        required: false
+        default: '5'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'config/**'
+      - 'style/**'
+      - 'scripts/**'
+      - '.github/workflows/radar.yml'
+
+# Only the token permissions Pages deployment actually needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A scheduled run and a push must not deploy over each other.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck, build and test
+        # A broken build must never reach the published site.
+        run: npm test
+
+      # The database is not in git. Caching it is what lets research history,
+      # published-post memory and repeat detection survive between runs.
+      - name: Restore radar database
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: radar-db-${{ github.run_id }}
+          restore-keys: |
+            radar-db-
+
+      - name: Fetch sources and score topics
+        env:
+          # Raises the GitHub API limit from 60/hour to 5000 for the eight
+          # GitHub-backed sources. Provided automatically, no setup needed.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run radar
+
+      - name: Pre-write drafts for the top topics
+        # Never fails the publish: no key, a rate limit or a bad response all
+        # mean "publish the radar without drafts", not "publish nothing".
+        continue-on-error: true
+        env:
+          AI_PROVIDER: ${{ vars.AI_PROVIDER || 'groq' }}
+          OPENAI_API_KEY: ${{ secrets.AI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.AI_MODEL }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "No AI_API_KEY secret set — publishing the radar without pre-written drafts."
+            echo "Add one from https://console.groq.com/keys to get drafts written for you."
+            exit 0
+          fi
+          npm run pregenerate -- --count "${{ github.event.inputs.pregenerate_count || '5' }}"
+
+      - name: Build the static site
+        run: npm run site
+
+      - name: Save radar database
+        uses: actions/cache/save@v4
+        # Saved even when a later step fails, so a bad deploy does not throw
+        # away a good research run.
+        if: always()
+        with:
+          path: data
+          key: radar-db-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
