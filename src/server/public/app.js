@@ -843,6 +843,39 @@ function aiSettings() {
   keyRow.appendChild(el('span', { class: 'hint' }, [keyLink]));
   wrap.appendChild(keyRow);
 
+  /*
+    The model picker.
+
+    Hosted model IDs are retired on a few months' notice — Groq dropped
+    llama-3.3-70b-versatile and Google dropped gemini-2.0-flash, both of which
+    shipped here as defaults and were already dead. Rather than hardcode a name
+    that dies, ask the provider what it runs today.
+  */
+  const modelRow = el('div', { class: 'setting' });
+  const modelSelect = el('select', { attrs: { id: 'ai-model' } });
+  const modelHint = el('span', { class: 'hint', text: t('ai.modelHint') });
+
+  const setModelOptions = (models) => {
+    clear(modelSelect);
+    const current = window.aiClient.model;
+    const all = models.includes(current) ? models : [current, ...models];
+    for (const id of all) {
+      const option = el('option', { text: id, attrs: { value: id } });
+      if (id === current) option.selected = true;
+      modelSelect.appendChild(option);
+    }
+  };
+  setModelOptions([window.aiClient.model]);
+  modelSelect.addEventListener('change', () => {
+    window.aiClient.setModel(modelSelect.value);
+    flash(t('ai.modelSet', { model: modelSelect.value }));
+  });
+
+  modelRow.appendChild(el('label', { text: t('ai.model'), attrs: { for: 'ai-model' } }));
+  modelRow.appendChild(modelSelect);
+  modelRow.appendChild(modelHint);
+  wrap.appendChild(modelRow);
+
   wrap.appendChild(
     el('div', { class: 'btn-row' }, [
       el('button', {
@@ -859,10 +892,32 @@ function aiSettings() {
                 return;
               }
               try {
+                // The model list first: if the configured model has been
+                // retired, this is what turns a dead end into a dropdown.
+                //
+                // Best effort, never fatal. Some providers restrict /models
+                // on a free key, and refusing to connect over that would be
+                // punishing you for a listing you do not need.
+                try {
+                  const models = await window.aiClient.listModels();
+                  if (models.length > 0) {
+                    if (!models.includes(window.aiClient.model)) {
+                      window.aiClient.setModel(models[0]);
+                      flash(t('ai.modelRetired', { model: models[0] }), 'warn');
+                    }
+                    setModelOptions(models);
+                  }
+                } catch (listError) {
+                  /* Fall through to the connection test, which is the real check. */
+                }
+
                 await window.aiClient.test();
                 keyInput.value = '';
                 keyInput.setAttribute('placeholder', '••••••••••••••••');
-                flash(t('ai.testOk', { provider: window.aiClient.providerInfo.label }));
+                flash(
+                  t('ai.testOk', { provider: window.aiClient.providerInfo.label }) +
+                    ` ${t('ai.usingModel', { model: window.aiClient.model })}`,
+                );
               } catch (error) {
                 flash(aiErrorMessage(error), 'error');
               }

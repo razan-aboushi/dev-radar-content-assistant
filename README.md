@@ -267,6 +267,7 @@ yourself.
 | `npm run site` | Build the static site into `site/` for GitHub Pages |
 | `npm run site:preview` | Build it and serve it at http://127.0.0.1:4312 |
 | `npm run pregenerate -- --count 5` | Write drafts ahead of time for the top topics |
+| `npm run models` | List the models your provider actually runs today |
 | `npm test` | Build and run the test suite |
 | `npm run typecheck` | Type check without emitting |
 | `npm run build` | Compile to `dist/` |
@@ -434,8 +435,30 @@ Every option here is genuinely free and needs no credit card. Set one in
 ```ini
 AI_PROVIDER=groq
 OPENAI_API_KEY=gsk_your_key_here
-# OPENAI_MODEL=llama-3.3-70b-versatile   # optional, this is the default
+# OPENAI_MODEL=openai/gpt-oss-120b   # optional, this is the default
 ```
+
+### Model names go stale — here is how to deal with it
+
+Hosted model IDs get retired on a few months' notice, and the failure is a
+bare `404` that looks like a broken app. Two of the defaults originally
+shipped here were **already dead** when they were written:
+
+| Model | Retired |
+|---|---|
+| `llama-3.3-70b-versatile` (Groq) | 16 Aug 2026 |
+| `gemini-2.0-flash` (Google) | 1 Jun 2026 |
+
+So the defaults above are a starting guess, not a promise. Two things make
+that survivable:
+
+```bash
+npm run models      # prints what your provider actually runs today
+```
+
+and in the dashboard, **Settings → Save and test** fetches the provider's live
+model list, switches you off a retired model automatically, and leaves the rest
+as a dropdown. A model going away should cost you one click, not an afternoon.
 
 **Groq is the default recommendation** because it does not train on what you
 send it, publishes its limits so you can plan against them, and runs a 70B
@@ -800,7 +823,7 @@ npm run typecheck
 npm run build
 ```
 
-234 tests using Node's built-in test runner — no test framework dependency.
+237 tests using Node's built-in test runner — no test framework dependency.
 They cover text utilities, RSS/Atom/GitHub/HN adapter normalisation against
 fixture payloads, clustering and repeat detection, scoring (range, determinism,
 weight sum, decay behaviour), fact extraction and status rules, AI-tell

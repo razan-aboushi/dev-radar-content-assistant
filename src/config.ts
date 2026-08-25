@@ -65,12 +65,21 @@ export type AiProviderName = 'none' | 'ollama' | 'openai-compatible';
  * Named shortcuts for the free hosted APIs.
  *
  * All of these speak the OpenAI chat-completions protocol, so they need no new
- * provider class — only a base URL and a sensible default model. Setting
+ * provider class — only a base URL and a default model. Setting
  * AI_PROVIDER=groq is the same as setting openai-compatible plus two URLs, and
  * far easier to get right.
  *
- * Every one has a standing free tier that needs no credit card. Model names do
- * change; override with OPENAI_MODEL and check the provider's model list.
+ * A warning about the `model` values, learned the hard way. Hosted model IDs
+ * are retired on a few months' notice and the call then fails with a bare 404:
+ *
+ *   llama-3.3-70b-versatile   shut down by Groq   16 Aug 2026
+ *   gemini-2.0-flash          shut down by Google  1 Jun 2026
+ *
+ * Both were shipped here as defaults and both were already dead. So treat
+ * these as a starting guess, not a promise. The dashboard asks the provider
+ * for its live model list and lets you pick, and `npm run models` prints the
+ * same list for the CLI. If a call ever returns "model not found", that is
+ * what to reach for.
  */
 export const FREE_PROVIDER_PRESETS: Record<
   string,
@@ -78,33 +87,50 @@ export const FREE_PROVIDER_PRESETS: Record<
 > = {
   groq: {
     baseUrl: 'https://api.groq.com/openai/v1',
-    model: 'llama-3.3-70b-versatile',
+    // Groq's own recommended replacement for llama-3.3-70b-versatile.
+    model: 'openai/gpt-oss-120b',
     label: 'Groq',
     keyUrl: 'https://console.groq.com/keys',
     trainsOnInput: false,
   },
   gemini: {
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    model: 'gemini-2.0-flash',
+    // Google's stated migration target from the retired 2.0 Flash.
+    model: 'gemini-3.5-flash',
     label: 'Google Gemini',
     keyUrl: 'https://aistudio.google.com/apikey',
     trainsOnInput: true,
   },
   openrouter: {
     baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'meta-llama/llama-3.3-70b-instruct:free',
+    // Only ":free" suffixed IDs are free on OpenRouter, and the set is small
+    // and changes; checked against the public catalogue, which needs no key:
+    //   curl https://openrouter.ai/api/v1/models
+    model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
     label: 'OpenRouter',
     keyUrl: 'https://openrouter.ai/keys',
     trainsOnInput: false,
   },
   cerebras: {
     baseUrl: 'https://api.cerebras.ai/v1',
-    model: 'llama-3.3-70b',
+    model: 'gpt-oss-120b',
     label: 'Cerebras',
     keyUrl: 'https://cloud.cerebras.ai',
     trainsOnInput: false,
   },
 };
+
+/** Model IDs known to be retired. Shipping one is a bug, so a test checks. */
+export const RETIRED_MODEL_IDS: readonly string[] = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'llama-3.1-70b-versatile',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-001',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+];
 
 function rawProvider(): string {
   return str('AI_PROVIDER', 'none').toLowerCase().trim();

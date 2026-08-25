@@ -24,37 +24,45 @@
 
   var KEY_STORAGE = 'dev-radar.aiKey';
   var PROVIDER_STORAGE = 'dev-radar.aiProvider';
+  var MODEL_STORAGE = 'dev-radar.aiModel';
 
   /**
    * Free tiers, no credit card. Kept in step with FREE_PROVIDER_PRESETS in
    * src/config.ts; a test asserts the two lists match.
+   *
+   * `model` is a starting guess, not a promise: hosted model IDs get retired
+   * on a few months' notice and the call then fails with a bare 404. Both
+   * defaults originally shipped here were already dead when written. That is
+   * why listModels() exists and why Settings offers a picker — a retired model
+   * should be a dropdown, not a dead end.
    */
   var PROVIDERS = {
     groq: {
       label: 'Groq',
       baseUrl: 'https://api.groq.com/openai/v1',
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       keyUrl: 'https://console.groq.com/keys',
       trainsOnInput: false,
     },
     gemini: {
       label: 'Google Gemini',
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash',
       keyUrl: 'https://aistudio.google.com/apikey',
       trainsOnInput: true,
     },
     openrouter: {
       label: 'OpenRouter',
       baseUrl: 'https://openrouter.ai/api/v1',
-      model: 'meta-llama/llama-3.3-70b-instruct:free',
+      // Only ":free" suffixed IDs cost nothing on OpenRouter.
+      model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       keyUrl: 'https://openrouter.ai/keys',
       trainsOnInput: false,
     },
     cerebras: {
       label: 'Cerebras',
       baseUrl: 'https://api.cerebras.ai/v1',
-      model: 'llama-3.3-70b',
+      model: 'gpt-oss-120b',
       keyUrl: 'https://cloud.cerebras.ai',
       trainsOnInput: false,
     },
@@ -81,6 +89,16 @@
   function providerName() {
     var stored = read(PROVIDER_STORAGE);
     return Object.prototype.hasOwnProperty.call(PROVIDERS, stored) ? stored : 'groq';
+  }
+
+  /** Models are remembered per provider, so switching back keeps your choice. */
+  function modelKey(provider) {
+    return MODEL_STORAGE + '.' + (provider || providerName());
+  }
+
+  function currentModel(provider) {
+    var name = provider || providerName();
+    return read(modelKey(name)) || PROVIDERS[name].model;
   }
 
   /**
@@ -152,7 +170,7 @@
           authorization: 'Bearer ' + key,
         },
         body: JSON.stringify({
-          model: options.model || provider.model,
+          model: options.model || currentModel(options.provider),
           temperature: options.temperature === undefined ? 0.85 : options.temperature,
           max_tokens: options.maxTokens || 2400,
           messages: [
@@ -201,10 +219,56 @@
       return Boolean(read(KEY_STORAGE));
     },
 
+    get model() {
+      return currentModel();
+    },
+
     setProvider: function (name) {
       if (!Object.prototype.hasOwnProperty.call(PROVIDERS, name)) return false;
       write(PROVIDER_STORAGE, name);
       return true;
+    },
+
+    setModel: function (id) {
+      write(modelKey(), String(id || '').trim());
+    },
+
+    /**
+     * Asks the provider what it can actually run today.
+     *
+     * This is the answer to model IDs being retired without warning: rather
+     * than shipping a name that dies in three months, ask. Every provider here
+     * speaks the OpenAI /models endpoint.
+     */
+    listModels: async function () {
+      var provider = PROVIDERS[providerName()];
+      var key = read(KEY_STORAGE);
+      if (!key) throw failure('noKey');
+
+      var response;
+      try {
+        response = await fetch(provider.baseUrl + '/models', {
+          headers: { authorization: 'Bearer ' + key },
+        });
+      } catch (error) {
+        throw failure('network');
+      }
+      var text = await response.text();
+      if (!response.ok) throw failure(describe(response.status, text), text.slice(0, 200));
+
+      var parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        throw failure('malformed');
+      }
+      var models = (parsed.data || parsed.models || [])
+        .map(function (entry) {
+          return typeof entry === 'string' ? entry : entry.id || entry.name;
+        })
+        .filter(Boolean);
+      models.sort();
+      return models;
     },
 
     setKey: function (value) {
@@ -252,7 +316,7 @@
         aiTells: [],
         status: 'draft',
         createdAt: new Date().toISOString(),
-        model: PROVIDERS[providerName()].model,
+        model: currentModel(),
         language: request.language,
       };
     },

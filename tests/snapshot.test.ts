@@ -9,7 +9,7 @@ import { createTestDb } from '../src/db';
 import { insertContent, insertItems } from '../src/db/repositories';
 import { buildTopics } from '../src/pipeline/run';
 import { buildSnapshot } from '../src/snapshot';
-import { FREE_PROVIDER_PRESETS } from '../src/config';
+import { FREE_PROVIDER_PRESETS, RETIRED_MODEL_IDS } from '../src/config';
 import { cleanDraft } from '../src/writing/linkedin';
 import { renderPublishText } from '../src/writing/publish';
 import { loadProfile } from '../src/writing/style';
@@ -325,6 +325,7 @@ test('the static build reads per-language report files', async () => {
 function loadAiClient(options: { response?: unknown; status?: number; store?: Record<string, string> } = {}) {
   const store = options.store ?? {};
   const calls: Array<{ url: string; body: any; headers: any }> = [];
+  const modelCalls: Array<{ url: string; headers: any }> = [];
   const win: Record<string, unknown> = {
     localStorage: {
       getItem: (k: string) => (Object.prototype.hasOwnProperty.call(store, k) ? store[k]! : null),
@@ -335,7 +336,10 @@ function loadAiClient(options: { response?: unknown; status?: number; store?: Re
     setTimeout: globalThis.setTimeout,
     clearTimeout: globalThis.clearTimeout,
     async fetch(url: string, init: any) {
-      calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
+      // listModels is a GET with no body; only completions carry one.
+      const body = init && init.body ? JSON.parse(init.body) : null;
+      if (body) calls.push({ url, body, headers: init.headers });
+      else modelCalls.push({ url, headers: init.headers });
       const status = options.status ?? 200;
       const payload = options.response ?? { choices: [{ message: { content: 'Generated body.' } }] };
       return { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(payload) };
@@ -348,7 +352,7 @@ function loadAiClient(options: { response?: unknown; status?: number; store?: Re
     context,
     { filename: 'ai.js' },
   );
-  return { ai: win.aiClient as any, calls, store };
+  return { ai: win.aiClient as any, calls, modelCalls, store };
 }
 
 test('the browser client refuses to call anything without a key', async () => {
@@ -559,6 +563,62 @@ test('the browser provider list matches the server preset list exactly', () => {
       `${name} data policy differs between client and server`,
     );
   }
+});
+
+test('no preset ships a model ID that has been retired', () => {
+  // Both defaults originally shipped here were already dead: Groq retired
+  // llama-3.3-70b-versatile on 16 Aug 2026 and Google retired
+  // gemini-2.0-flash on 1 Jun 2026. Every call 404s, which reads as a broken
+  // button. This is the guard against doing it again.
+  const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
+  for (const [name, preset] of Object.entries(FREE_PROVIDER_PRESETS)) {
+    assert.ok(
+      !RETIRED_MODEL_IDS.includes(preset.model),
+      `${name} defaults to the retired model "${preset.model}"`,
+    );
+  }
+  for (const retired of RETIRED_MODEL_IDS) {
+    assert.ok(!ai.includes(`model: '${retired}'`), `ai.js defaults to the retired model "${retired}"`);
+  }
+});
+
+test('the browser can ask a provider which models it actually runs', async () => {
+  // The fix for retired IDs is to ask rather than guess.
+  const { ai, calls, modelCalls } = loadAiClient({
+    response: { data: [{ id: 'zeta-model' }, { id: 'alpha-model' }] },
+  });
+  ai.setKey('k');
+  ai.setProvider('groq');
+  // Copied out of the vm realm: an array built in there has a different
+  // Array.prototype, which deepStrictEqual rejects on identity alone.
+  const models = [...(await ai.listModels())];
+
+  assert.deepEqual(models, ['alpha-model', 'zeta-model'], 'models should come back sorted');
+  assert.equal(calls.length, 0, 'listModels must not post a completion');
+  assert.equal(modelCalls.length, 1);
+  assert.equal(modelCalls[0]!.url, 'https://api.groq.com/openai/v1/models');
+  assert.equal(modelCalls[0]!.headers.authorization, 'Bearer k');
+
+  await assert.rejects(
+    () => loadAiClient().ai.listModels(),
+    (error: Error & { reason?: string }) => error.reason === 'noKey',
+  );
+});
+
+test('a chosen model is remembered per provider and used for generation', async () => {
+  const store: Record<string, string> = {};
+  const first = loadAiClient({ store });
+  first.ai.setProvider('groq');
+  first.ai.setModel('groq-choice');
+  first.ai.setProvider('cerebras');
+  assert.notEqual(first.ai.model, 'groq-choice', 'a model must not leak across providers');
+  first.ai.setProvider('groq');
+  assert.equal(first.ai.model, 'groq-choice');
+
+  const second = loadAiClient({ store });
+  second.ai.setKey('k');
+  await second.ai.generate({ kind: 'linkedin', system: 's', prompt: 'p', language: 'en', hashtags: [] });
+  assert.equal(second.calls[0]!.body.model, 'groq-choice', 'generation must use the chosen model');
 });
 
 test('every free AI preset is an https OpenAI-compatible endpoint', () => {

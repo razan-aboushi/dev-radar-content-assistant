@@ -136,12 +136,18 @@ test('the policy names the AI endpoints and nothing else', () => {
 
 test('the API key is never sent anywhere but the chosen provider', () => {
   const ai = fs.readFileSync(path.join(config.root, 'src/server/public/ai.js'), 'utf8');
-  // Exactly one fetch, and its URL is built from the preset table.
+  // Every request URL is built from the preset table, so the key can only
+  // reach an origin the Content-Security-Policy already allows.
   const fetches = [...ai.matchAll(/fetch\(([^,)]+)/g)].map((m) => m[1]!.trim());
-  assert.deepEqual(fetches, ["provider.baseUrl + '/chat/completions'"]);
+  assert.deepEqual(fetches.sort(), [
+    "provider.baseUrl + '/chat/completions'",
+    "provider.baseUrl + '/models'",
+  ]);
   // The key is read from storage and put in an Authorization header only.
   assert.ok(ai.includes("authorization: 'Bearer ' + key"));
   assert.ok(!/console\.(log|info|warn|error)\s*\(\s*key/.test(ai), 'the key must never be logged');
+  // And never written into a URL, where it would land in logs and referrers.
+  assert.ok(!/\?[^'"]*key=/.test(ai), 'the key must not travel in a query string');
 });
 
 /* ----------------------------------------------------------- workflow */
